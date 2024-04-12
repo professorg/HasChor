@@ -46,6 +46,12 @@
             # Default programs can be disabled by setting to 'null'
             # tools = hp: { fourmolu = hp.fourmolu; ghcid = null; };
 
+            mkShellArgs = {
+              packages = with pkgs; [
+                haskellPackages.haskell-language-server
+              ];
+            };
+
             hlsCheck.enable = pkgs.stdenv.isDarwin; # On darwin, sandbox is disabled, so HLS can use the network.
           };
         };
