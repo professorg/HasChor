@@ -55,20 +55,21 @@ broadcast _ = liftAp BCast
 
 -- * Message transport backends
 
--- class (Applicative f) => ApplicativeIO f where
---   liftIO :: IO a -> f a
--- 
--- instance ApplicativeIO IO where
---   liftIO = id
--- 
--- instance (Applicative f) => ApplicativeIO (Compose IO f) where
---   liftIO = Compose . fmap pure
--- 
--- instance (Applicative f) => ApplicativeIO (Compose f IO) where
---   liftIO = Compose . pure
+class (Applicative f) => ApplicativeIO f where
+  liftIOA :: IO a -> f a
+
+instance ApplicativeIO IO where
+  liftIOA = id
+
+instance (Applicative f) => ApplicativeIO (Compose IO f) where
+  liftIOA = Compose . fmap pure
+
+instance (Applicative f) => ApplicativeIO (Compose f IO) where
+  liftIOA = Compose . pure
 
 -- | A message transport backend defines a /configuration/ of type @c@ that
 -- carries necessary bookkeeping information, then defines @c@ as an instance
 -- of `Backend` and provides a `runNetwork` function.
 class Backend c where
-  runNetwork :: MonadIO m => c -> LocTm -> NetworkA f a -> m a
+  runNetwork :: ApplicativeIO m => c -> LocTm -> NetworkA f a -> m a
+

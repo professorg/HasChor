@@ -71,7 +71,7 @@ epp c l' = runAp handler c
           <&> (unwrap <&>)
           $> const Empty
       | toLocTm r == l'        = -- wrap <$> recv (toLocTm s)
-        const <$> (wrap <$> recv (toLocTm s))
+        const <$> (wrap <$> recv a (toLocTm s))
       | otherwise              = pure $ const Empty
 
     handler (Cond l a c)
@@ -81,7 +81,8 @@ epp c l' = runAp handler c
               (c <&> (unwrap <&>))
               l'
       | otherwise       = -- recv (toLocTm l) >>= \x -> epp (c x) l'
-        recv a (toLocTm l) <*> epp c l'
+        const <$> (epp c l' <*> recv a (toLocTm l))
+        -- recv a (toLocTm l) <*> epp c l'
 
 -- * ChoreoA operations
 
