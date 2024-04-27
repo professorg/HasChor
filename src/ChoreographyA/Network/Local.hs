@@ -4,14 +4,17 @@
 module ChoreographyA.Network.Local where
 
 import Choreography.Location
-import Choreography.Network
+import ChoreographyA.Network
+import Control.Applicative.Free
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Monad
-import Control.Monad.Freer
+-- import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
+import Control.Applicative.IO
+import Data.Functor
 
 -- | Each location is associated with a message buffer which stores messages sent
 -- from other locations.
@@ -38,14 +41,19 @@ mkLocalConfig locs = LocalConfig <$> foldM f HashMap.empty locs
 locs :: LocalConfig -> [LocTm]
 locs = HashMap.keys . locToBuf
 
-runNetworkLocal :: MonadIO m => LocalConfig -> LocTm -> Network m a -> m a
-runNetworkLocal cfg self prog = interpFreer handler prog
+runNetworkLocal :: MonadIO f => LocalConfig -> LocTm -> NetworkA f a -> f a
+runNetworkLocal cfg self prog = runAp handler prog
   where
-    handler :: MonadIO m => NetworkSig m a -> m a
+    handler :: MonadIO f => NetworkSigA f a -> f a
     handler (Run m)    = m
-    handler (Send a l) = liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a)
+    handler (Send l) = -- writeChan ((locToBuf cfg ! l) ! self) (show a)
+      flip fmap show <$> liftIO
+        (writeChanA ((locToBuf cfg ! l) ! self))
     handler (Recv l)   = liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
-    handler(BCast a)   = mapM_ handler $ fmap (Send a) (locs cfg)
+    handler BCast  = -- mapM_ handler $ fmap (Send a) (locs cfg)
+      let locs' = locs cfg in
+      let locs'' = fmap Send (locs cfg) in
+      foldr (\x y -> y *> handler x) (pure (const ())) locs''
 
 instance Backend LocalConfig where
   runNetwork = runNetworkLocal

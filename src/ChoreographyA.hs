@@ -5,7 +5,7 @@
 module ChoreographyA (
   -- * Locations and Located Values
   -- * The Choreo monad
-  Choreo,
+  ChoreoA,
   -- ** Choreo operations
   locally,
   (~>),
@@ -15,23 +15,24 @@ module ChoreographyA (
 
   -- * Message transport backends
   -- ** The HTTP backend
-  Host,
-  Port,
-  HttpConfig,
-   mkHttpConfig,
+--   Host,
+--   Port,
+--   HttpConfig,
+--    mkHttpConfig,
 
   -- * Running choreographies
-  runChoreo,
+  runChoreoA,
   runChoreography
   ) where
 
+import Control.Monad.IO.Class
 import Choreography.Location
 import ChoreographyA.Choreo
 import ChoreographyA.Network
-import ChoreographyA.Network.Http
+-- import ChoreographyA.Network.Http
 import ChoreographyA.Network.Local
 import Data.Proxy
 
 -- | Run a choreography with a message transport backend.
-runChoreography :: (Backend config, MonadIO m) => config -> Choreo m a -> LocTm -> m a
+runChoreography :: (Backend config, MonadIO f) => config -> ChoreoA f a -> LocTm -> f a
 runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)

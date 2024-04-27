@@ -15,6 +15,7 @@ import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
 import Servant.API
 import Servant.Client (ClientM, client, runClientM, BaseUrl(..), mkClientEnv, Scheme(..))
 import Servant.Server (Handler, Server, serve)
+import Control.Applicative.Free
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Monad
@@ -68,7 +69,7 @@ mkRecvChans cfg = foldM f HashMap.empty (locs cfg)
 
 -- * HTTP backend
 
-runNetworkHttp :: MonadIO m => HttpConfig -> LocTm -> NetworkA f a -> m a
+runNetworkHttp :: MonadIO f => HttpConfig -> LocTm -> NetworkA f a -> f a
 runNetworkHttp cfg self prog = do
   mgr <- liftIO $ newManager defaultManagerSettings
   chans <- liftIO $ mkRecvChans cfg
@@ -78,18 +79,18 @@ runNetworkHttp cfg self prog = do
   liftIO $ killThread recvT
   return result
   where
-    runNetworkMain :: MonadIO m => Manager -> RecvChans -> NetworkA f a -> m a
-    runNetworkMain mgr chans = interpFreer handler
+    runNetworkMain :: MonadIO f => Manager -> RecvChans -> NetworkA f a -> f a
+    runNetworkMain mgr chans = runAp handler -- interpFreer handler
       where
-        handler :: MonadIO m => NetworkSigA f a -> m a
-        handler (Run m)    = m
-        handler(Send a l) = liftIO $ do
-          res <- runClientM (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))
+        handler :: MonadIO f => NetworkSigA f a -> f a
+        handler (Run c)    = c
+        handler (Send l) = liftIO $ do
+          res <- runClientM (send self $ show _) (mkClientEnv mgr (locToUrl cfg ! l)) -- (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))
           case res of
             Left err -> putStrLn $ "Error : " ++ show err
             Right _  -> return ()
         handler (Recv l)   = liftIO $ read <$> readChan (chans ! l)
-        handler (BCast a)  = mapM_ handler $ fmap (Send a) (locs cfg)
+        handler BCast = mapM_ handler $ fmap Send (locs cfg)
 
     api :: Proxy API
     api = Proxy

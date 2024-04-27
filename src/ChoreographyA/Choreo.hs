@@ -8,6 +8,7 @@ module ChoreographyA.Choreo where
 import Choreography.Location
 import ChoreographyA.Network
 import Control.Applicative.Free
+import Control.Selective.Free
 import Data.Functor
 import Data.List
 import Data.Proxy
@@ -43,6 +44,8 @@ data ChoreoSigA f a where
 
 -- | Applicative functor for writing choreographies.
 type ChoreoA f = Ap (ChoreoSigA f)
+
+type ChoreoAS f = Select (ChoreoSigA f)
 
 -- | Run a `ChoreoA` applicative functor directly.
 runChoreoA :: Applicative f => ChoreoA f a -> f a
@@ -96,11 +99,11 @@ locally l g = liftAp (Local l g)
 
 -- | Communication between a sender and a receiver.
 (~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
-     => (Proxy l, Proxy a)  -- ^ A pair of a sender's location and a value located
+     => Proxy l  -- ^ A pair of a sender's location and a value located
                           -- at the sender
      -> Proxy l'          -- ^ A receiver's location.
      -> ChoreoA f (a @ l -> a @ l')
-(~>) (l, a) l' = liftAp (Comm l a l')
+(~>) l l' = liftAp (Comm l Proxy l')
 
 -- | Conditionally execute choreographies based on a located value.
 cond :: (Show a, Read a, KnownSymbol l)
@@ -118,7 +121,7 @@ cond l c = liftAp (Cond l Proxy c)
       -> Proxy l'                   -- ^ A receiver's location.
       -> ChoreoA f (a @ l')
 (~~>) (l, g) l' =
-  (l, Proxy) ~> l' <*> locally l g
+  l ~> l' <*> locally l g
   
 
 -- do

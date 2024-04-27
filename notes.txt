@@ -1,0 +1,7 @@
+
+https://www.reddit.com/r/haskell/comments/3e5o2b/limitations_of_io_as_an_applicative_functor/
+
+FreeA E
+
+FreeAS E
+
