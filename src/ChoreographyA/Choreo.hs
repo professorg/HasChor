@@ -5,7 +5,7 @@
 -- | This module defines `ChoreoA`, the applicative functor for writing choreographies.
 module ChoreographyA.Choreo where
 
-import Choreography.Location
+import ChoreographyA.Location
 import ChoreographyA.Network
 import Control.Applicative.Free
 import Control.Selective.Free

@@ -26,7 +26,7 @@ module ChoreographyA (
   ) where
 
 import Control.Monad.IO.Class
-import Choreography.Location
+import ChoreographyA.Location
 import ChoreographyA.Choreo
 import ChoreographyA.Network
 -- import ChoreographyA.Network.Http

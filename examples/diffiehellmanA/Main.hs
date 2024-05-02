@@ -7,7 +7,7 @@ module Main where
 
 import Choreography (mkHttpConfig, runChoreography)
 import ChoreographyA.Choreo
-import Choreography.Location
+import ChoreographyA.Location
 import Data.Proxy
 import Data.Time
 import System.Environment
@@ -53,8 +53,7 @@ diffieHellman =
           randomRIO (200, 1000 :: Int)
         )) in
   let pb = (pa |*> (alice ~> bob)) in
-  let ga = 
-          alice `locally` (liftA2 _ _ _)
+  let ga = liftA2 compW (alice `locally` (fmap (\f unwrap x -> f (10, unwrap x)) randomRIOA)) pa
           --   (pure (\x f unwrap -> f (10, unwrap x))))
           -- <*> pa
           -- <*> randomRIOA in

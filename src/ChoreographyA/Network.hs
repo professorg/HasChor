@@ -4,7 +4,7 @@
 -- multiple message transport backends.
 module ChoreographyA.Network where
 
-import Choreography.Location
+import ChoreographyA.Location
 import Control.Applicative
 import Control.Applicative.Free
 import Data.Composition

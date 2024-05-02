@@ -42,6 +42,7 @@ library
         ChoreographyA
         ChoreographyA.Choreo
         ChoreographyA.Network
+        ChoreographyA.Location
         -- ChoreographyA.Network.Http
         ChoreographyA.Network.Local
         Control.Monad.Freer
