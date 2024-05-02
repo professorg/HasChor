@@ -53,9 +53,12 @@ diffieHellman =
           randomRIO (200, 1000 :: Int)
         )) in
   let pb = (pa |*> (alice ~> bob)) in
-  let ga = alice `locally` (pa |*> (
-          flip <$> _
-        )) in
+  let ga = 
+          alice `locally` (liftA2 _ _ _)
+          --   (pure (\x f unwrap -> f (10, unwrap x))))
+          -- <*> pa
+          -- <*> randomRIOA in
+          in
   a_init *>
   b_wait *>
   _
