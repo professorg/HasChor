@@ -42,70 +42,46 @@ diffieHellman :: ChoreoA IO (Integer @ "alice", Integer @ "bob")
 diffieHellman =
   -- wait for alice to initiate the process
   -- type Unwrap l = forall a. a @ l -> a
-  let a_init = alice `locally` (const <$> (
-          putStrLn "enter to start key exchange..." *>
-          getLine)) in
-  let b_wait = bob `locally` (const <$> 
-          putStrLn "waiting for alice to initiate key exchange") in
+  let a_init = alice `locally` \_ ->
+          (putStrLnA ?? "enter to start key exchange...") *> getLine in
+  let b_wait = bob `locally` \_ ->
+          putStrLnA ?? "waiting for alice to initiate key exchange" in
     
-  let pa = alice `locally` (const <$> (
+  let pa = alice `locally` \_ ->
           (primeNums !!) <$>
-          (randomRIOA ?? (200, 1000 :: Int)))) in
+          (randomRIOA ?? (200, 1000 :: Int)) in
   let pb = (pa |*> (alice ~> bob)) in
   let ga = liftA2 compLL
-              (alice `locally` ((\f unwrap x -> f (10, unwrap x)) <$> randomRIOA))
+              (alice `locally` \unwrap -> (\f x -> f (10, unwrap x)) <$> randomRIOA)
               pa in
   let gb = (ga |*> (alice ~> bob)) in
     
   -- alice and bob select secrets
-  let a  = alice `locally` (const <$> (randomRIOA ?? (200, 1000 :: Int))) in 
-  let b  = bob   `locally` (const <$> (randomRIOA ?? (200, 1000 :: Int))) in
+  let a  = alice `locally` \_ -> randomRIOA ?? (200, 1000 :: Integer) in 
+  let b  = bob   `locally` \_ -> randomRIOA ?? (200, 1000 :: Integer) in
 
-  a_init *>
-  b_wait *>
-  _
-  -- bob `locally` (pure $ \unwrap -> do
-  --   putStrLn "waiting for alice to initiate key exchange")
-  -- |*>
-  -- alice `locally` (pure $ \unwrap -> do
-  --   x <- randomRIO (200, 1000 :: Int)
-  --   return $ primeNums !! x)
-  -- |*>
-  -- (alice, Proxy) ~> bob
-  -- |*> do
+  let a' = compLL3 <$> (alice `locally` (\unwrap ->
+                                           pure (\a b c -> unwrap a ^ unwrap b `mod` unwrap c)))
+           <*> ga <*> a <*> pa in
+  let b' = compLL3 <$> (bob   `locally` (\unwrap ->
+                                           pure (\a b c -> unwrap a ^ unwrap b `mod` unwrap c)))
+           <*> gb <*> b <*> pb in
 
+  let a'' = (a' |*> (alice ~> bob)) in 
+  let b'' = (b' |*> (bob ~> alice)) in
 
-  -- -- alice picks p and g and sends them to bob
-  -- pb <- (alice, pa) ~> bob
-  -- ga <- alice `locally` \unwrap -> do randomRIO (10, unwrap pa)
-  -- gb <- (alice, ga) ~> bob
+  let s1 = compLL3 <$> (alice `locally` (\unwrap ->
+                                           (\f a b c ->
+                                              let s = unwrap a ^ unwrap b `mod` unwrap c in
+                                                f ("alice's shared key: " ++ show s) `seq` s) <$> putStrLnA))
+           <*> b'' <*> a <*> pa in
+  let s2 = compLL3 <$> (bob   `locally` (\unwrap ->
+                                           (\f a b c ->
+                                              let s = unwrap a ^ unwrap b `mod` unwrap c in
+                                                f ("bob's shared key: " ++ show s) `seq` s) <$> putStrLnA))
+           <*> a'' <*> b <*> pb in
 
-  -- -- alice and bob select secrets
-  -- a <- alice `locally` \unwrap -> do randomRIO (200, 1000 :: Integer)
-  -- b <- bob `locally` \unwrap -> do randomRIO (200, 1000 :: Integer)
-
-  -- -- alice and bob computes numbers that they exchange
-  -- a' <- alice `locally` \unwrap -> do return $ unwrap ga ^ unwrap a `mod` unwrap pa
-  -- b' <- bob `locally` \unwrap -> do return $ unwrap gb ^ unwrap b `mod` unwrap pb
-
-  -- -- exchange numbers
-  -- a'' <- (alice, a') ~> bob
-  -- b'' <- (bob, b') ~> alice
-
-  -- -- compute shared key
-  -- s1 <-
-  --   alice `locally` \unwrap ->
-  --     let s = unwrap b'' ^ unwrap a `mod` unwrap pa
-  --      in do
-  --           putStrLn ("alice's shared key: " ++ show s)
-  --           return s
-  -- s2 <-
-  --   bob `locally` \unwrap ->
-  --     let s = unwrap a'' ^ unwrap b `mod` unwrap pb
-  --      in do
-  --           putStrLn ("bob's shared key: " ++ show s)
-  --           return s
-  -- return (s1, s2)
+  (,) <$> s1 <*> s2
 
 main :: IO ()
 main = do

@@ -27,7 +27,7 @@ type Unwrap l = forall a. a @ l -> a
 data ChoreoSigA f a where
   Local :: (KnownSymbol l)
         => Proxy l
-        -> f (Unwrap l -> a)
+        -> (Unwrap l -> f a)
         -> ChoreoSigA f (a @ l)
 
   Comm :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
@@ -52,7 +52,7 @@ runChoreoA :: Applicative f => ChoreoA f a -> f a
 runChoreoA = runAp handler
   where
     handler :: Applicative f => ChoreoSigA f a -> f a
-    handler (Local _ g)  = wrap <$> (g <*> pure unwrap) -- wrap <$> (g <*> pure unwrap)
+    handler (Local _ g)  = wrap <$> g unwrap
     handler (Comm {}) = pure $ wrap . unwrap
     handler (Cond _ _ c) = -- runChoreoA $ c (unwrap a)
       let c' = c <&> (unwrap <&>) in
@@ -64,7 +64,7 @@ epp c l' = runAp handler c
   where
     handler :: ChoreoSigA f a -> NetworkA f a
     handler (Local l g)
-      | toLocTm l == l' = wrap <$> (run g <*> pure unwrap)
+      | toLocTm l == l' = wrap <$> run (g unwrap) 
       | otherwise       = pure Empty
 
     handler (Comm s a r)
@@ -92,7 +92,7 @@ epp c l' = runAp handler c
 -- | Perform a local computation at a given location.
 locally :: KnownSymbol l
         => Proxy l           -- ^ Location performing the local computation.
-        -> f (Unwrap l -> a) -- ^ The local computation given a constrained
+        -> (Unwrap l -> f a) -- ^ The local computation given a constrained
                              -- unwrap funciton.
         -> ChoreoA f (a @ l)
 locally l g = liftAp (Local l g)
@@ -116,7 +116,7 @@ cond l c = liftAp (Cond l Proxy c)
 
 -- | A variant of `~>` that sends the result of a local computation.
 (~~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
-      => (Proxy l, f (Unwrap l -> a)) -- ^ A pair of a sender's location and a local
+      => (Proxy l, (Unwrap l -> f a)) -- ^ A pair of a sender's location and a local
                                     -- computation.
       -> Proxy l'                   -- ^ A receiver's location.
       -> ChoreoA f (a @ l')
@@ -131,9 +131,9 @@ cond l c = liftAp (Cond l Proxy c)
 -- | A variant of `cond` that conditonally executes choregraphies based on the
 -- result of a local computation.
 cond' :: (Show a, Read a, KnownSymbol l)
-      => (Proxy l, f (Unwrap l -> a)) -- ^ A pair of a location and a local
+      => (Proxy l, (Unwrap l -> f a)) -- ^ A pair of a location and a local
                                     -- computation.
-      -> ChoreoA f(a -> b)          -- ^ A function that describes the follow-up
+      -> ChoreoA f (a -> b)          -- ^ A function that describes the follow-up
                                     -- choreographies based on the result of the
                                     -- local computation.
       -> ChoreoA f b

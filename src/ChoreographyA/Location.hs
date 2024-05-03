@@ -50,3 +50,6 @@ compL _ _ = error "this should never happen for a well-typed choreography"
 
 compLL :: (a @ l -> b) @ l -> a @ l -> b @ l
 compLL (Wrap f) a = Wrap (f a)
+
+compLL3 :: (a @ l -> b @ l -> c @ l -> d) @ l -> a @ l -> b @ l -> c @ l -> d @ l
+compLL3 (Wrap f) a b c = Wrap (f a b c)
