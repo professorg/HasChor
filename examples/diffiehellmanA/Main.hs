@@ -81,7 +81,7 @@ diffieHellman =
                                                 f ("bob's shared key: " ++ show s) `seq` s) <$> putStrLnA))
            <*> a'' <*> b <*> pb in
 
-  (,) <$> s1 <*> s2
+  a_init *> b_wait *> ((,) <$> s1 <*> s2)
 
 main :: IO ()
 main = do
