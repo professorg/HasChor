@@ -13,6 +13,7 @@ import Data.Time
 import System.Environment
 import System.Random
 import Control.Applicative.IO ((|*>), putStrLnA, ofIOAction)
+import Control.Lens.Lens
 import Data.Functor
 
 -- helper functions around prime number
@@ -43,21 +44,23 @@ diffieHellman =
   -- type Unwrap l = forall a. a @ l -> a
   let a_init = alice `locally` (const <$> (
           putStrLn "enter to start key exchange..." *>
-          getLine
-        )) in
+          getLine)) in
   let b_wait = bob `locally` (const <$> 
-          putStrLn "waiting for alice to initiate key exchange"
-        ) in
+          putStrLn "waiting for alice to initiate key exchange") in
+    
   let pa = alice `locally` (const <$> (
           (primeNums !!) <$>
-          randomRIO (200, 1000 :: Int)
-        )) in
+          (randomRIOA ?? (200, 1000 :: Int)))) in
   let pb = (pa |*> (alice ~> bob)) in
-  let ga = liftA2 compLL (alice `locally` (fmap (\f unwrap x -> f (10, unwrap x)) randomRIOA)) pa
-          --   (pure (\x f unwrap -> f (10, unwrap x))))
-          -- <*> pa
-          -- <*> randomRIOA in
-          in
+  let ga = liftA2 compLL
+              (alice `locally` ((\f unwrap x -> f (10, unwrap x)) <$> randomRIOA))
+              pa in
+  let gb = (ga |*> (alice ~> bob)) in
+    
+  -- alice and bob select secrets
+  let a  = alice `locally` (const <$> (randomRIOA ?? (200, 1000 :: Int))) in 
+  let b  = bob   `locally` (const <$> (randomRIOA ?? (200, 1000 :: Int))) in
+
   a_init *>
   b_wait *>
   _
