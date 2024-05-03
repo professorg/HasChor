@@ -51,9 +51,9 @@ diffieHellman =
           (primeNums !!) <$>
           (randomRIOA ?? (200, 1000 :: Int)) in
   let pb = (pa |*> (alice ~> bob)) in
-  let ga = liftA2 compLL
-              (alice `locally` \unwrap -> (\f x -> f (10, unwrap x)) <$> randomRIOA)
-              pa in
+  let ga = compLL <$> (alice `locally` \unwrap ->
+                          randomRIOA <&> \f x -> f (10, unwrap x))
+              <*> pa in
   let gb = (ga |*> (alice ~> bob)) in
     
   -- alice and bob select secrets
@@ -70,15 +70,17 @@ diffieHellman =
   let a'' = (a' |*> (alice ~> bob)) in 
   let b'' = (b' |*> (bob ~> alice)) in
 
-  let s1 = compLL3 <$> (alice `locally` (\unwrap ->
-                                           (\f a b c ->
-                                              let s = unwrap a ^ unwrap b `mod` unwrap c in
-                                                f ("alice's shared key: " ++ show s) `seq` s) <$> putStrLnA))
+  let s1 = compLL3 <$>
+              (alice `locally` \unwrap ->
+                                 putStrLnA <&> \f a b c ->
+                                                 let s = unwrap a ^ unwrap b `mod` unwrap c in
+                                                   f ("alice's shared key: " ++ show s) `seq` s)
            <*> b'' <*> a <*> pa in
-  let s2 = compLL3 <$> (bob   `locally` (\unwrap ->
-                                           (\f a b c ->
-                                              let s = unwrap a ^ unwrap b `mod` unwrap c in
-                                                f ("bob's shared key: " ++ show s) `seq` s) <$> putStrLnA))
+  let s2 = compLL3 <$>
+              (bob   `locally` \unwrap ->
+                                 putStrLnA <&> \f a b c ->
+                                                 let s = unwrap a ^ unwrap b `mod` unwrap c in
+                                                   f ("bob's shared key: " ++ show s) `seq` s)
            <*> a'' <*> b <*> pb in
 
   a_init *> b_wait *> ((,) <$> s1 <*> s2)
