@@ -53,7 +53,7 @@ diffieHellman =
           randomRIO (200, 1000 :: Int)
         )) in
   let pb = (pa |*> (alice ~> bob)) in
-  let ga = liftA2 compW (alice `locally` (fmap (\f unwrap x -> f (10, unwrap x)) randomRIOA)) pa
+  let ga = liftA2 compLL (alice `locally` (fmap (\f unwrap x -> f (10, unwrap x)) randomRIOA)) pa
           --   (pure (\x f unwrap -> f (10, unwrap x))))
           -- <*> pa
           -- <*> randomRIOA in

@@ -43,7 +43,10 @@ mkLoc loc = do
   let locName = mkName loc
   let p = mkName "Data.Proxy.Proxy"
   pure [SigD locName (AppT (ConT p) (LitT (StrTyLit loc))),ValD (VarP locName) (NormalB (ConE p)) []]
-  
-compW :: (a -> b) @ l -> a -> b @ l
-compW (Wrap f) a = Wrap (f a)
-compW _ _ = error "this should never happen for a well-typed choreography"
+
+compL :: (a -> b) @ l -> a @ l -> b @ l
+compL (Wrap f) (Wrap a) = Wrap (f a)
+compL _ _ = error "this should never happen for a well-typed choreography"
+
+compLL :: (a @ l -> b) @ l -> a @ l -> b @ l
+compLL (Wrap f) a = Wrap (f a)
