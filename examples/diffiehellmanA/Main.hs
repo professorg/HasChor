@@ -5,9 +5,10 @@
 
 module Main where
 
-import Choreography (mkHttpConfig, runChoreography)
+import ChoreographyA (runChoreography)
 import ChoreographyA.Choreo
 import ChoreographyA.Location
+import ChoreographyA.Network.Local (mkLocalConfig)
 import Data.Proxy
 import Data.Time
 import System.Environment
@@ -15,6 +16,7 @@ import System.Random
 import Control.Applicative.IO ((|*>), putStrLnA, ofIOAction)
 import Control.Lens.Lens
 import Data.Functor
+import Control.Concurrent.Async (async, mapConcurrently_, wait)
 
 -- helper functions around prime number
 -- https://nulldereference.wordpress.com/2012/02/04/generating-prime-numbers-with-haskell/
@@ -87,14 +89,11 @@ diffieHellman =
 
 main :: IO ()
 main = do
-  [loc] <- getArgs
-  x <- case loc of
-    "alice" -> runChoreography config diffieHellman "alice"
-    "bob" -> runChoreography config diffieHellman "bob"
+  config <- mkLocalConfig locs
+  putStrLn "Starting"
+  !res <- mapConcurrently_ (runChoreography config diffieHellman) locs
+  putStrLn "Done"
   return ()
   where
-    config =
-      mkHttpConfig
-        [ ("alice", ("localhost", 5000)),
-          ("bob", ("localhost", 5001))
-        ]
+    locs = [ "alice", "bob" ]
+
