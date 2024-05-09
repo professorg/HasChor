@@ -42,6 +42,7 @@ library
         ChoreographyA
         ChoreographyA.Choreo
         ChoreographyA.Network
+        ChoreographyA.Location
         -- ChoreographyA.Network.Http
         ChoreographyA.Network.Local
         Control.Monad.Freer
@@ -125,6 +126,7 @@ executable diffiehellmanA
         , base    >= 4.16 && < 4.20
         , random  >= 1.2  && < 1.3
         , time    >= 1.11 && < 1.13
+        , lens    >= 5.2.3 && < 5.3
 
 executable karatsuba
     hs-source-dirs:   examples/karatsuba

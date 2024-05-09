@@ -3,7 +3,7 @@
 -- | This module defines the multi-thread backend for the `Network` monad.
 module ChoreographyA.Network.Local where
 
-import Choreography.Location
+import ChoreographyA.Location
 import ChoreographyA.Network
 import Control.Applicative.Free
 import Control.Concurrent
