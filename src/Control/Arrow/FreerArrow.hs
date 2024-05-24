@@ -80,12 +80,13 @@ put = embed Put
 
 -- |- A program that reads from the state and writes back the state.
 echo :: FreerArrow (StateEff s) () ()
-echo = put . get
+echo = get >>> put
 
 -- |- Echo but with data sharing. You get once but put twice.
 echo2 :: FreerArrow (StateEff s) () ((), ())
--- (>>>) is from the Category typeclass. Every arrow is a category.
-echo2 = rmap (\x -> (x, x)) get >>> first put >>> second put  
+-- (>>>) is from the Category typeclass. Every arrow is a category. (&&&) is an
+-- arrow combinator.
+echo2 = get >>> put &&& put
 
 -- |- The type for effect handlers.
 type x ~> y = forall a b. x a b -> y a b
