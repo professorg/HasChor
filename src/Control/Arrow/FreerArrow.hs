@@ -46,7 +46,7 @@ instance Arrow (FreerArrow e) where
 -- |- Freer arrows are profunctors.
 instance Profunctor (FreerArrow e) where
   dimap f g (Hom h) = Hom (g . h . f)
-  dimap f g (Comp f' g' x y) = Comp (f' . f) id x (dimap g' g y)
+  dimap f g (Comp f' g' x y) = Comp (f' . f) g' x (dimap id g y)
 
 -- |- Freer arrows are strong profunctors.
 instance Strong (FreerArrow e) where

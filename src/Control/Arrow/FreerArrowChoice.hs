@@ -42,7 +42,7 @@ instance ArrowChoice (FreerArrowChoice e) where
 
 instance Profunctor (FreerArrowChoice e) where
   dimap f g (Hom h) = Hom (g . h . f)
-  dimap f g (Comp f' g' x y) = Comp (f' . f) id x (dimap g' g y)
+  dimap f g (Comp f' g' x y) = Comp (f' . f) g' x (dimap id g y)
 
 instance Strong (FreerArrowChoice e) where
   first' (Hom f) = Hom $ B.first f
@@ -74,7 +74,7 @@ instance Category (FreerArrowChoice e) where
 
   f . (Hom g) = dimap g id f
   f . (Comp f' g' x y) = Comp f' g' x (f . y)
-
+  
 
 data StateEff :: Type -> Type -> Type -> Type where
   Get :: StateEff s () s
@@ -99,8 +99,8 @@ echoWithIf = lmap (\case
 
 type x ~> y = forall a b. x a b -> y a b
 
-interp :: (Choice arr, Arrow arr) =>
+interp :: (Profunctor arr, ArrowChoice arr) =>
   (e ~> arr) -> FreerArrowChoice e x y -> arr x y
 interp _       (Hom f) = arr f
-interp handler (Comp f g x y) = dimap f g (left' (first (handler x))) >>>
+interp handler (Comp f g x y) = dimap f g (left (first (handler x))) >>>
                                         interp handler y
