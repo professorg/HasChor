@@ -7,53 +7,54 @@ module ChoreographyArrow.Network where
 import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
+import Control.Arrow.FreerArrow
 
 -- * The Network monad
 
 -- | Effect signature for the `Network` monad.
-data NetworkSig m a where
+data NetworkSig ar b a where
   -- | Local computation.
-  Run :: m a
-      -> NetworkSig m a
+  Run :: ar b a
+      -> NetworkSig ar b a
   -- | Sending.
   Send :: Show a
-       => a
-       -> LocTm
-       -> NetworkSig m ()
+       => LocTm
+       -> NetworkSig ar a ()
   -- | Receiving.
   Recv :: Read a
        => LocTm
-       -> NetworkSig m a
+       -> NetworkSig ar () a
   -- | Broadcasting.
   BCast :: Show a
-        => a
-        -> NetworkSig m ()
+        => NetworkSig ar a ()
 
 -- | Monad that represents network programs.
-type Network m = Freer (NetworkSig m)
+type Network ar = FreerArrow (NetworkSig ar)
 
 -- * Network operations
 
 -- | Perform a local computation.
-run :: m a -> Network m a
-run m = toFreer $ Run m
+run :: ar b a -> Network ar b a
+run ar = embed $ Run ar
 
 -- | Send a message to a receiver.
-send :: Show a => a -> LocTm -> Network m ()
-send a l = toFreer $ Send a l
+send :: Show a => LocTm -> Network ar a ()
+send l = embed $ Send l
 
 -- | Receive a message from a sender.
-recv :: Read a => LocTm -> Network m a
-recv l = toFreer $ Recv l
+recv :: Read a => LocTm -> Network ar () a
+recv l = embed $ Recv l
 
 -- | Broadcast a message to all participants.
-broadcast :: Show a => a -> Network m ()
-broadcast a = toFreer $ BCast a
+broadcast :: Show a => Network ar a ()
+broadcast = embed BCast
 
 -- * Message transport backends
 
 -- | A message transport backend defines a /configuration/ of type @c@ that
 -- carries necessary bookkeeping information, then defines @c@ as an instance
 -- of `Backend` and provides a `runNetwork` function.
-class Backend c where
-  runNetwork :: MonadIO m => c -> LocTm -> Network m a -> m a
+
+--TODO
+--class Backend c where
+--  runNetwork :: MonadIO m => c -> LocTm -> Network m a -> m a

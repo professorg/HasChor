@@ -13,6 +13,8 @@ import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
 
+--TODO
+
 -- | Each location is associated with a message buffer which stores messages sent
 -- from other locations.
 type MsgBuf = HashMap LocTm (Chan String)
@@ -38,15 +40,17 @@ mkLocalConfig locs = LocalConfig <$> foldM f HashMap.empty locs
 locs :: LocalConfig -> [LocTm]
 locs = HashMap.keys . locToBuf
 
-runNetworkLocal :: MonadIO m => LocalConfig -> LocTm -> Network m a -> m a
-runNetworkLocal cfg self prog = interpFreer handler prog
-  where
-    handler :: MonadIO m => NetworkSig m a -> m a
-    handler (Run m)    = m
-    handler (Send a l) = liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a)
-    handler (Recv l)   = liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
-    handler(BCast a)   = mapM_ handler $ fmap (Send a) (locs cfg)
+--TODO
+-- runNetworkLocal :: MonadIO m => LocalConfig -> LocTm -> Network m a -> m a
+-- runNetworkLocal cfg self prog = interpFreer handler prog
+--   where
+--     handler :: MonadIO m => NetworkSig m a -> m a
+--     handler (Run m)    = m
+--     handler (Send a l) = liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a)
+--     handler (Recv l)   = liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
+--     handler(BCast a)   = mapM_ handler $ fmap (Send a) (locs cfg)
 
-instance Backend LocalConfig where
-  runNetwork = runNetworkLocal
+--TODO
+-- instance Backend LocalConfig where
+--   runNetwork = runNetworkLocal
 

@@ -22,6 +22,8 @@ import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Network.Wai.Handler.Warp (run)
 
+--TODO
+
 -- * Servant API
 
 type API = "send" :> Capture "from" LocTm :> ReqBody '[PlainText] String :> PostNoContent
@@ -68,45 +70,47 @@ mkRecvChans cfg = foldM f HashMap.empty (locs cfg)
 
 -- * HTTP backend
 
-runNetworkHttp :: MonadIO m => HttpConfig -> LocTm -> Network m a -> m a
-runNetworkHttp cfg self prog = do
-  mgr <- liftIO $ newManager defaultManagerSettings
-  chans <- liftIO $ mkRecvChans cfg
-  recvT <- liftIO $ forkIO (recvThread cfg chans)
-  result <- runNetworkMain mgr chans prog
-  liftIO $ threadDelay 1000000 -- wait until all outstanding requests to be completed
-  liftIO $ killThread recvT
-  return result
-  where
-    runNetworkMain :: MonadIO m => Manager -> RecvChans -> Network m a -> m a
-    runNetworkMain mgr chans = interpFreer handler
-      where
-        handler :: MonadIO m => NetworkSig m a -> m a
-        handler (Run m)    = m
-        handler(Send a l) = liftIO $ do
-          res <- runClientM (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))
-          case res of
-            Left err -> putStrLn $ "Error : " ++ show err
-            Right _  -> return ()
-        handler (Recv l)   = liftIO $ read <$> readChan (chans ! l)
-        handler (BCast a)  = mapM_ handler $ fmap (Send a) (locs cfg)
+--TODO
+-- runNetworkHttp :: MonadIO m => HttpConfig -> LocTm -> Network m a -> m a
+-- runNetworkHttp cfg self prog = do
+--   mgr <- liftIO $ newManager defaultManagerSettings
+--   chans <- liftIO $ mkRecvChans cfg
+--   recvT <- liftIO $ forkIO (recvThread cfg chans)
+--   result <- runNetworkMain mgr chans prog
+--   liftIO $ threadDelay 1000000 -- wait until all outstanding requests to be completed
+--   liftIO $ killThread recvT
+--   return result
+--   where
+--     runNetworkMain :: MonadIO m => Manager -> RecvChans -> Network m a -> m a
+--     runNetworkMain mgr chans = interpFreer handler
+--       where
+--         handler :: MonadIO m => NetworkSig m a -> m a
+--         handler (Run m)    = m
+--         handler(Send a l) = liftIO $ do
+--           res <- runClientM (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))
+--           case res of
+--             Left err -> putStrLn $ "Error : " ++ show err
+--             Right _  -> return ()
+--         handler (Recv l)   = liftIO $ read <$> readChan (chans ! l)
+--         handler (BCast a)  = mapM_ handler $ fmap (Send a) (locs cfg)
+-- 
+--     api :: Proxy API
+--     api = Proxy
+-- 
+--     send :: LocTm -> String -> ClientM NoContent
+--     send = client api
+-- 
+--     server :: RecvChans -> Server API
+--     server chans = handler
+--       where
+--         handler :: LocTm -> String -> Handler NoContent
+--         handler rmt msg = do
+--           liftIO $ writeChan (chans ! rmt) msg
+--           return NoContent
+-- 
+--     recvThread :: HttpConfig -> RecvChans -> IO ()
+--     recvThread cfg chans = run (baseUrlPort $ locToUrl cfg ! self ) (serve api $ server chans)
 
-    api :: Proxy API
-    api = Proxy
-
-    send :: LocTm -> String -> ClientM NoContent
-    send = client api
-
-    server :: RecvChans -> Server API
-    server chans = handler
-      where
-        handler :: LocTm -> String -> Handler NoContent
-        handler rmt msg = do
-          liftIO $ writeChan (chans ! rmt) msg
-          return NoContent
-
-    recvThread :: HttpConfig -> RecvChans -> IO ()
-    recvThread cfg chans = run (baseUrlPort $ locToUrl cfg ! self ) (serve api $ server chans)
-
-instance Backend HttpConfig where
-  runNetwork = runNetworkHttp
+--TODO
+-- instance Backend HttpConfig where
+--   runNetwork = runNetworkHttp

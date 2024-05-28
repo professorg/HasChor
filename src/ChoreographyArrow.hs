@@ -15,8 +15,8 @@ module ChoreographyArrow (
   locally,
   (~>),
   (~~>),
-  cond,
-  cond',
+--   cond,
+--   cond',
 
   -- * Message transport backends
   -- ** The HTTP backend
@@ -27,7 +27,7 @@ module ChoreographyArrow (
 
   -- * Running choreographies
   runChoreo,
-  runChoreography
+--   runChoreography
   ) where
 
 import ChoreographyArrow.Location
@@ -38,6 +38,7 @@ import ChoreographyArrow.Network.Local
 import Control.Monad.IO.Class
 import Data.Proxy
 
+--TODO
 -- | Run a choreography with a message transport backend.
-runChoreography :: (Backend config, MonadIO m) => config -> Choreo m a -> LocTm -> m a
-runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)
+-- runChoreography :: (Backend config, MonadIO m) => config -> Choreo m a -> LocTm -> m a
+-- runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)
