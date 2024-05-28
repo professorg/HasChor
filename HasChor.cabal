@@ -39,6 +39,12 @@ library
         Choreography.Network
         Choreography.Network.Http
         Choreography.Network.Local
+        ChoreographyArrow
+        ChoreographyArrow.Choreo
+        ChoreographyArrow.Location
+        ChoreographyArrow.Network
+        ChoreographyArrow.Network.Http
+        ChoreographyArrow.Network.Local
         Control.Monad.Freer
         Control.Arrow.FreerArrow
     build-depends:
