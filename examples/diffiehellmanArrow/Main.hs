@@ -19,6 +19,9 @@ import Control.Arrow.ArrowIO
 import Control.Category
 import Prelude hiding (id, (.))
 import Control.Arrow.FreerArrow
+import ChoreographyArrow.Network.Local (mkLocalConfig)
+import ChoreographyArrow (runChoreography)
+import ChoreographyArrow.Network (Backend)
 
 -- helper functions around prime number
 -- https://nulldereference.wordpress.com/2012/02/04/generating-prime-numbers-with-haskell/
@@ -45,133 +48,95 @@ discard = arr (const ())
 aliceWait :: ArrowIO ar => Choreo ar () (() @ "alice")
 aliceWait =
   alice `locally` (
-    discard >>>
-    arrIO0 (putStrLn "enter to start key exchange...") >>>
-    arrIO0 getLine >>>
-    discard
+      arrIO0 (putStrLn "enter to start key exchange...") >>>
+      arrIO0 getLine >>>
+      discard
     )
 
 bobWait :: ArrowIO ar => Choreo ar () (() @ "bob")
 bobWait =
   bob `locally` (
-    discard >>>
     arrIO0 (putStrLn "waiting for alice to initiate key exchange")
     )
 
+genSecret' :: ArrowIO ar => ar () Integer
+genSecret' = arrIO0 (randomRIO (200, 1000 :: Integer))
+
+genSecret :: ArrowIO ar => ar b Integer
+genSecret = discard >>> genSecret'
+
 diffieHellman :: (ArrowIO ar, Strong ar) => Choreo ar () (Integer @ "alice", Integer @ "bob")
-diffieHellman = --do
+diffieHellman = proc () -> do
   -- wait for alice to initiate the process
-  aliceWait >>> discard >>>
-  bobWait >>> discard >>>
+  aliceWait -< ()
+  bobWait -< ()
 
-  alice `locally` (
-    discard >>>
-    arrIO0 (randomRIO (200, 1000 :: Int)) >>>
-    arr (primeNums !! )
-  ) >>> -- pa
+  pa <- alice `locally` (
+      arrIO0 (randomRIO (200, 1000 :: Int)) >>>
+      arr (primeNums !! )
+    ) -< ()
 
-  arr (\pa -> (pa, pa)) >>>
+  pb <- (alice ~> bob) -< pa
 
-  second' (alice ~> bob) >>> -- (pa, pb)
+  ga <- (alice `locally` (
+      arr (\(unwrap, pa) -> (10, unwrap pa)) >>>
+      arrIO randomRIO
+    )) -< pa
 
-  arr (\(pa, pb) -> (pa, (pa, pb))) >>>
+  gb <-  (alice ~> bob) -< ga
 
-  first' (alice `locally` (
-    arr (\(unwrap, pa) -> (10, unwrap pa)) >>>
-    arrIO randomRIO
-  )) >>> -- (ga, (pa, pb))
+  a <- (alice `locally` genSecret) -< ()
 
-  arr (\(ga, (pa, pb)) -> (ga, (ga, pa, pb))) >>>
+  b <- (bob `locally` genSecret) -< ()
 
-  first' (alice ~> bob) >>> -- (gb, (ga, pa, pb))
+  a' <- (alice `locally` (
+      arr (\(unwrap, (ga, a, pa)) -> unwrap ga ^ unwrap a `mod` unwrap pa)
+    )) -< (ga, a, pa)
 
-  arr (\(gb, (ga, pa, pb)) -> ((), (ga, gb, pa, pb))) >>>
+  b' <- (bob `locally` (
+      arr (\(unwrap, (gb, b, pb)) -> unwrap gb ^ unwrap b `mod` unwrap pb)
+    )) -< (gb, b, pb)
 
-  first' (alice `locally` (
-    discard >>>
-    arrIO0 (randomRIO (200, 1000 :: Integer))
-  )) >>> -- (a, (ga, gb, pa, pb))
+  a'' <-  (alice ~> bob) -< a'
 
-  arr (\(a, (ga, gb, pa, pb)) -> ((), (a, ga, gb, pa, pb))) >>>
+  b'' <- (bob ~> alice) -< b'
 
-  first' (bob `locally` (
-    discard >>>
-    arrIO0 (randomRIO (200, 1000 :: Integer))
-  )) >>> -- (b, (a, ga, gb, pa, pb))
+  s1 <- (alice `locally` (proc (unwrap, (b'', a, pa)) -> do
+      s <- arr (\(unwrap, (b'', a, pa)) -> unwrap b'' ^ unwrap a `mod` unwrap pa) -< (unwrap, (b'', a, pa))
+      (
+          arr (\s -> "alice's shared key: " ++ show s) >>>
+          arrIO putStrLn
+        ) -< s
+      returnA -< s
+    )) -< (b'', a, pa)
 
-  arr (\(b, (a, ga, gb, pa, pb)) -> ((), (a, b, ga, gb, pa, pb))) >>>
+  s2 <- (bob `locally` (proc (unwrap, (b'', a, pa)) -> do
+      s <- arr (\(unwrap, (a'', b, pb)) -> unwrap a'' ^ unwrap b `mod` unwrap pb) -< (unwrap, (b'', a, pa))
+      (
+          arr (\s -> "bob's shared key: " ++ show s) >>>
+          arrIO putStrLn
+        ) -< s
+      returnA -< s
+    )) -< (a'', b, pb)
 
+  returnA -< (s1, s2)
 
-  arr (\((), (a, b, ga, gb, pa, pb)) -> ((ga, a, pa), (a, b, ga, gb, pa, pb))) >>>
+instance ArrowIO (Kleisli IO) where
+  arrIO f = Kleisli f
 
-  first' (alice `locally` (
-    arr (\(unwrap, (ga, a, pa)) -> unwrap ga ^ unwrap a `mod` unwrap pa)
-  )) >>> -- (a', (a, b, ga, gb, pa, pb))
+-- Kleisli IO a b
+-- a -> IO b
 
-  arr (\(a', (a, b, ga, gb, pa, pb)) -> ((), (a', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (a', a, b, ga, gb, pa, pb)) -> ((gb, b, pb), (a', a, b, ga, gb, pa, pb))) >>>
-
-  first' (bob `locally` (
-    arr (\(unwrap, (gb, b, pb)) -> unwrap gb ^ unwrap b `mod` unwrap pb)
-  )) >>> -- (b', (a', a, b, ga, gb, pa, pb))
-
-  arr (\(b', (a', a, b, ga, gb, pa, pb)) -> ((), (a', b', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (a', b', a, b, ga, gb, pa, pb)) -> (a', (a', b', a, b, ga, gb, pa, pb))) >>>
-
-  first' (alice ~> bob) >>> -- (a'', (a', b', a, b, ga, gb, pa, pb))
-
-  arr (\(a'', (a', b', a, b, ga, gb, pa, pb)) -> ((), (a'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (a'', a', b', a, b, ga, gb, pa, pb)) -> (b', (a'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  first' (bob ~> alice) >>> -- (b'', (a'', a', b', a, b, ga, gb, pa, pb))
-
-  arr (\(b'', (a'', a', b', a, b, ga, gb, pa, pb)) -> ((), (a'', b'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (a'', b'', a', b', a, b, ga, gb, pa, pb)) -> ((b'', a, pa), (a'', b'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  first' (alice `locally` (
-    arr (\(unwrap, (b'', a, pa)) -> unwrap b'' ^ unwrap a `mod` unwrap pa) >>>
-    arr (\s -> (s, s)) >>>
-    second' (
-      arr (\s -> "alice's shared key: " ++ show s) >>>
-      arrIO putStrLn
-    ) >>>
-    arr fst
-  )) >>> -- (s1, (a'', b'', a', b', a, b, ga, gb, pa, pb))
-
-  arr (\(s1, (a'', b'', a', b', a, b, ga, gb, pa, pb)) -> ((), (s1, a'', b'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (s1, a'', b'', a', b', a, b, ga, gb, pa, pb)) -> ((a'', b, pb), (s1, a'', b'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  first' (bob `locally` (
-    arr (\(unwrap, (a'', b, pb)) -> unwrap a'' ^ unwrap b `mod` unwrap pb) >>>
-    arr (\s -> (s, s)) >>>
-    second' (
-      arr (\s -> "bob's shared key: " ++ show s) >>>
-      arrIO putStrLn
-    ) >>>
-    arr fst
-  )) >>> -- (s2, (s1, a'', b'', a', b', a, b, ga, gb, pa, pb))
-
-  arr (\(s2, (s1, a'', b'', a', b', a, b, ga, gb, pa, pb)) -> ((), (s1, s2, a'', b'', a', b', a, b, ga, gb, pa, pb))) >>>
-
-  arr (\((), (s1, s2, a'', b'', a', b', a, b, ga, gb, pa, pb)) -> (s1, s2))
+main' :: Backend config => config -> LocTm -> Kleisli IO () (Integer @ "alice", Integer @ "bob")
+main' config l = runChoreography config diffieHellman l
 
 --TODO
 main :: IO ()
-main = pure ()
--- main = do
---   [loc] <- getArgs
---   x <- case loc of
---     "alice" -> runChoreography config diffieHellman "alice"
---     "bob" -> runChoreography config diffieHellman "bob"
---   return ()
---   where
---     config =
---       mkHttpConfig
---         [ ("alice", ("localhost", 5000)),
---           ("bob", ("localhost", 5001))
---         ]
+main = do
+  [loc] <- getArgs
+  config <- mkLocalConfig ["alice", "bob"]
+  x <- case loc of
+    "alice" -> runKleisli (main' config "alice") ()
+    "bob" -> runKleisli (main' config "bob") ()
+  return ()
+

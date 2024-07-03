@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs     #-}
+{-# LANGUAGE Arrows    #-}
 
 -- | This module implments the HTTP message transport backend for the `Network`
 -- monad.
 module ChoreographyArrow.Network.Http where
 
 import ChoreographyArrow.Location
-import ChoreographyArrow.Network hiding (run)
+import ChoreographyArrow.Network
 import Data.ByteString (fromStrict)
 import Data.Proxy (Proxy(..))
 import Data.HashMap.Strict (HashMap, (!))
@@ -20,9 +21,12 @@ import Control.Concurrent.Chan
 import Control.Monad
 import Control.Monad.Freer
 import Control.Monad.IO.Class
-import Network.Wai.Handler.Warp (run)
-
---TODO
+import Control.Arrow.ArrowIO
+import Control.Arrow.FreerArrow
+import Control.Arrow
+import Control.Category
+import Data.Profunctor
+import Prelude hiding ((.), id)
 
 -- * Servant API
 
@@ -71,46 +75,47 @@ mkRecvChans cfg = foldM f HashMap.empty (locs cfg)
 -- * HTTP backend
 
 --TODO
--- runNetworkHttp :: MonadIO m => HttpConfig -> LocTm -> Network m a -> m a
--- runNetworkHttp cfg self prog = do
---   mgr <- liftIO $ newManager defaultManagerSettings
---   chans <- liftIO $ mkRecvChans cfg
---   recvT <- liftIO $ forkIO (recvThread cfg chans)
---   result <- runNetworkMain mgr chans prog
---   liftIO $ threadDelay 1000000 -- wait until all outstanding requests to be completed
---   liftIO $ killThread recvT
---   return result
---   where
---     runNetworkMain :: MonadIO m => Manager -> RecvChans -> Network m a -> m a
---     runNetworkMain mgr chans = interpFreer handler
---       where
---         handler :: MonadIO m => NetworkSig m a -> m a
---         handler (Run m)    = m
---         handler(Send a l) = liftIO $ do
---           res <- runClientM (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))
+runNetworkHttp :: ArrowIO ar => HttpConfig -> LocTm -> Network ar b a -> ar b a
+runNetworkHttp cfg self prog = proc b -> do
+  mgr <- arrIO0 $ liftIO $ newManager defaultManagerSettings -< ()
+  chans <- arrIO (\cfg -> liftIO $ mkRecvChans cfg) -< cfg
+  recvT <- arrIO (\(cfg, chans) -> liftIO $ forkIO (recvThread cfg chans)) -< (cfg, chans)
+  -- result
+  arrIO0 $ liftIO $ threadDelay 1000000 -< () -- wait until all outstanding requests to be completed
+  arrIO $ (\recvT -> liftIO $ killThread recvT) -< recvT
+  returnA -< _
+--   result <- runNetworkMain prog -< (mgr, chans)
+--   returnA -< _
+  where
+    runNetworkMain :: ArrowIO ar => Network ar (Manager, RecvChans) a -> ar () a
+    runNetworkMain mgr chans = interp handler
+      where
+        handler :: ArrowIO ar => NetworkSig ar (Manager, RecvChans) a -> ar () a
+        handler (Run ar) = ar
+        handler (Send l) = _ -- proc a -> do -- liftIO $ do
+--           res <- arrIO $ (\a -> runClientM (send self $ show a) (mkClientEnv mgr (locToUrl cfg ! l))) -< a
 --           case res of
---             Left err -> putStrLn $ "Error : " ++ show err
---             Right _  -> return ()
---         handler (Recv l)   = liftIO $ read <$> readChan (chans ! l)
---         handler (BCast a)  = mapM_ handler $ fmap (Send a) (locs cfg)
+--             Left err -> arrIO $ (\err -> putStrLn $ "Error : " ++ show err) -< err
+--             Right _ -> returnA -< ()
+        handler (Recv l) = arrIO0 $ liftIO $ read <$> readChan (chans ! l)
+-- --         handler BCast    = arr (\a -> mapM_ handler $ fmap Send (locs cfg))
 -- 
---     api :: Proxy API
---     api = Proxy
--- 
---     send :: LocTm -> String -> ClientM NoContent
---     send = client api
--- 
---     server :: RecvChans -> Server API
---     server chans = handler
---       where
---         handler :: LocTm -> String -> Handler NoContent
---         handler rmt msg = do
---           liftIO $ writeChan (chans ! rmt) msg
---           return NoContent
--- 
---     recvThread :: HttpConfig -> RecvChans -> IO ()
---     recvThread cfg chans = run (baseUrlPort $ locToUrl cfg ! self ) (serve api $ server chans)
+    api :: Proxy API
+    api = Proxy
 
---TODO
--- instance Backend HttpConfig where
---   runNetwork = runNetworkHttp
+    send :: LocTm -> String -> ClientM NoContent
+    send = client api
+
+    server :: RecvChans -> Server API
+    server chans = handler
+      where
+        handler :: LocTm -> String -> Handler NoContent
+        handler rmt msg = do
+          liftIO $ writeChan (chans ! rmt) msg
+          return NoContent
+
+    recvThread :: HttpConfig -> RecvChans -> IO ()
+    recvThread cfg chans = _ -- run (baseUrlPort $ locToUrl cfg ! self ) (serve api $ server chans)
+
+instance Backend HttpConfig where
+  runNetwork = runNetworkHttp

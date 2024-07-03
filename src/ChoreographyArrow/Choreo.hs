@@ -16,6 +16,7 @@ import Data.Profunctor (Profunctor)
 import Control.Arrow
 import Control.Category
 import Prelude hiding (id, (.))
+import Control.Arrow.ArrowIO (ArrowIO)
 
 -- * The Choreo monad
 

@@ -20,25 +20,27 @@ module ChoreographyArrow (
 
   -- * Message transport backends
   -- ** The HTTP backend
-  Host,
-  Port,
-  HttpConfig,
-   mkHttpConfig,
+--   Host,
+--   Port,
+--  HttpConfig,
+--   mkHttpConfig,
 
   -- * Running choreographies
   runChoreo,
---   runChoreography
+  runChoreography
   ) where
 
 import ChoreographyArrow.Location
 import ChoreographyArrow.Choreo
 import ChoreographyArrow.Network
-import ChoreographyArrow.Network.Http
+--import ChoreographyArrow.Network.Http
 import ChoreographyArrow.Network.Local
 import Control.Monad.IO.Class
 import Data.Proxy
+import Control.Arrow.ArrowIO (ArrowIO)
+import Data.Profunctor (Profunctor)
 
 --TODO
 -- | Run a choreography with a message transport backend.
--- runChoreography :: (Backend config, MonadIO m) => config -> Choreo m a -> LocTm -> m a
--- runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)
+runChoreography :: (Backend config, ArrowIO ar, Profunctor ar) => config -> Choreo ar b a -> LocTm -> ar b a
+runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)

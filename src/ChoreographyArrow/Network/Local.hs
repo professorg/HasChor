@@ -12,8 +12,9 @@ import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
-
---TODO
+import Control.Arrow.ArrowIO
+import Control.Arrow.FreerArrow
+import Data.Profunctor (Profunctor)
 
 -- | Each location is associated with a message buffer which stores messages sent
 -- from other locations.
@@ -40,17 +41,16 @@ mkLocalConfig locs = LocalConfig <$> foldM f HashMap.empty locs
 locs :: LocalConfig -> [LocTm]
 locs = HashMap.keys . locToBuf
 
---TODO
--- runNetworkLocal :: MonadIO m => LocalConfig -> LocTm -> Network m a -> m a
--- runNetworkLocal cfg self prog = interpFreer handler prog
---   where
---     handler :: MonadIO m => NetworkSig m a -> m a
---     handler (Run m)    = m
---     handler (Send a l) = liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a)
---     handler (Recv l)   = liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
---     handler(BCast a)   = mapM_ handler $ fmap (Send a) (locs cfg)
+runNetworkLocal :: (ArrowIO ar, Profunctor ar) => LocalConfig -> LocTm -> Network ar b a -> ar b a
+runNetworkLocal cfg self prog = interp handler prog
+  where
+    handler :: ArrowIO ar => NetworkSig ar b a -> ar b a
+    handler (Run ar)    = ar
+    handler (Send l) = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
+    handler (Recv l)   = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
+--     handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
+--       foldr (>>>) id $ fmap Send (locs cfg)
 
---TODO
--- instance Backend LocalConfig where
---   runNetwork = runNetworkLocal
+instance Backend LocalConfig where
+  runNetwork = runNetworkLocal
 

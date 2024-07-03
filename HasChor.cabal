@@ -43,7 +43,7 @@ library
         ChoreographyArrow.Choreo
         ChoreographyArrow.Location
         ChoreographyArrow.Network
-        ChoreographyArrow.Network.Http
+        -- ChoreographyArrow.Network.Http
         ChoreographyArrow.Network.Local
         Control.Monad.Freer
         Control.Arrow.FreerArrow

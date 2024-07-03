@@ -8,6 +8,8 @@ import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Control.Arrow.FreerArrow
+import Control.Arrow.ArrowIO
+import Data.Profunctor (Profunctor)
 
 -- * The Network monad
 
@@ -25,8 +27,8 @@ data NetworkSig ar b a where
        => LocTm
        -> NetworkSig ar () a
   -- | Broadcasting.
-  BCast :: Show a
-        => NetworkSig ar a ()
+--   BCast :: Show a
+--         => NetworkSig ar a ()
 
 -- | Monad that represents network programs.
 type Network ar = FreerArrow (NetworkSig ar)
@@ -46,8 +48,8 @@ recv :: Read a => LocTm -> Network ar () a
 recv l = embed $ Recv l
 
 -- | Broadcast a message to all participants.
-broadcast :: Show a => Network ar a ()
-broadcast = embed BCast
+-- broadcast :: Show a => Network ar a ()
+-- broadcast = embed BCast
 
 -- * Message transport backends
 
@@ -55,6 +57,6 @@ broadcast = embed BCast
 -- carries necessary bookkeeping information, then defines @c@ as an instance
 -- of `Backend` and provides a `runNetwork` function.
 
---TODO
---class Backend c where
---  runNetwork :: MonadIO m => c -> LocTm -> Network m a -> m a
+class Backend c where
+  runNetwork :: (Profunctor ar, ArrowIO ar) => c -> LocTm -> Network ar b a -> ar b a
+
