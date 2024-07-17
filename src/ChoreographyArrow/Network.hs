@@ -10,6 +10,7 @@ import Control.Monad.IO.Class
 import Control.Arrow.FreerArrow
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
+import Control.Arrow (Kleisli (Kleisli))
 
 -- * The Network monad
 
@@ -57,6 +58,10 @@ recv l = embed $ Recv l
 -- carries necessary bookkeeping information, then defines @c@ as an instance
 -- of `Backend` and provides a `runNetwork` function.
 
+instance MonadIO m => ArrowIO (Kleisli m) where
+  arrIO prog = Kleisli $ liftIO . prog
+
+
 class Backend c where
-  runNetwork :: (Profunctor ar, ArrowIO ar) => c -> LocTm -> Network ar b a -> ar b a
+  runNetwork :: MonadIO m => c -> LocTm -> Network (Kleisli m) b a -> b -> m a
 

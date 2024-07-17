@@ -6,7 +6,6 @@
 
 module Main where
 
---import ChoreographyArrow (mkHttpConfig, runChoreography)
 import ChoreographyArrow.Choreo
 import ChoreographyArrow.Location
 import Data.Proxy
@@ -19,8 +18,7 @@ import Control.Arrow.ArrowIO
 import Control.Category
 import Prelude hiding (id, (.))
 import Control.Arrow.FreerArrow
-import ChoreographyArrow.Network.Local (mkLocalConfig)
-import ChoreographyArrow (runChoreography)
+import ChoreographyArrow (mkHttpConfig, runChoreography)
 import ChoreographyArrow.Network (Backend)
 
 -- helper functions around prime number
@@ -121,22 +119,20 @@ diffieHellman = proc () -> do
 
   returnA -< (s1, s2)
 
-instance ArrowIO (Kleisli IO) where
-  arrIO f = Kleisli f
-
 -- Kleisli IO a b
 -- a -> IO b
 
-main' :: Backend config => config -> LocTm -> Kleisli IO () (Integer @ "alice", Integer @ "bob")
-main' config l = runChoreography config diffieHellman l
-
---TODO
 main :: IO ()
 main = do
   [loc] <- getArgs
-  config <- mkLocalConfig ["alice", "bob"]
   x <- case loc of
-    "alice" -> runKleisli (main' config "alice") ()
-    "bob" -> runKleisli (main' config "bob") ()
+    "alice" -> runChoreography config diffieHellman "alice" ()
+    "bob" -> runChoreography config diffieHellman "bob" ()
   return ()
+  where
+    config =
+      mkHttpConfig
+        [ ("alice", ("localhost", 5000)),
+          ("bob", ("localhost", 5001))
+        ]
 

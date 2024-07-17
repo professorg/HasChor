@@ -20,10 +20,10 @@ module ChoreographyArrow (
 
   -- * Message transport backends
   -- ** The HTTP backend
---   Host,
---   Port,
---  HttpConfig,
---   mkHttpConfig,
+  Host,
+  Port,
+  HttpConfig,
+  mkHttpConfig,
 
   -- * Running choreographies
   runChoreo,
@@ -33,14 +33,15 @@ module ChoreographyArrow (
 import ChoreographyArrow.Location
 import ChoreographyArrow.Choreo
 import ChoreographyArrow.Network
---import ChoreographyArrow.Network.Http
+import ChoreographyArrow.Network.Http (Host, Port, HttpConfig, mkHttpConfig)
 import ChoreographyArrow.Network.Local
 import Control.Monad.IO.Class
 import Data.Proxy
 import Control.Arrow.ArrowIO (ArrowIO)
 import Data.Profunctor (Profunctor)
+import Control.Arrow (Kleisli)
 
 --TODO
 -- | Run a choreography with a message transport backend.
-runChoreography :: (Backend config, ArrowIO ar, Profunctor ar) => config -> Choreo ar b a -> LocTm -> ar b a
+runChoreography :: (Backend config, MonadIO m) => config -> Choreo (Kleisli m) b a -> LocTm -> b -> m a
 runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)
