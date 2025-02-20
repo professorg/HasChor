@@ -33,7 +33,7 @@ module ChoreographyArrow (
 import ChoreographyArrow.Location
 import ChoreographyArrow.Choreo
 import ChoreographyArrow.Network
-import ChoreographyArrow.Network.Http (Host, Port, HttpConfig, mkHttpConfig)
+import ChoreographyArrow.Network.Http
 import ChoreographyArrow.Network.Local
 import Control.Monad.IO.Class
 import Data.Proxy

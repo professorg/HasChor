@@ -8,7 +8,7 @@ module ChoreographyArrow.Choreo where
 import ChoreographyArrow.Location
 import ChoreographyArrow.Network
 import Control.Monad.Freer
-import Control.Arrow.FreerArrow
+import Control.Arrow.Freer.FreerArrow
 import Data.List
 import Data.Proxy
 import GHC.TypeLits

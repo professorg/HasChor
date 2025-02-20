@@ -23,7 +23,7 @@ import Control.Monad
 import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Control.Arrow.ArrowIO
-import Control.Arrow.FreerArrow
+import Control.Arrow.Freer.FreerArrow
 import Control.Arrow
 import Control.Category
 import Data.Profunctor
