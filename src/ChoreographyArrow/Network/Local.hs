@@ -13,9 +13,9 @@ import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
 import Control.Arrow.ArrowIO
-import Control.Arrow.Freer.FreerArrow
+import Control.Arrow.Freer.FreerArrowChoice
 import Data.Profunctor (Profunctor)
-import Control.Arrow (Kleisli (runKleisli))
+import Control.Arrow
 
 -- | Each location is associated with a message buffer which stores messages sent
 -- from other locations.
@@ -49,8 +49,8 @@ runNetworkLocal cfg self prog = runKleisli $ interp handler prog
     handler (Run ar) = ar
     handler (Send l) = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
     handler (Recv l) = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
---     handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
---       foldr (>>>) id $ fmap Send (locs cfg)
+    handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
+      Kleisli $ \x -> mapM_ (\l -> runKleisli (handler $ Send l) x) (locs cfg)
 
 instance Backend LocalConfig where
   runNetwork = runNetworkLocal

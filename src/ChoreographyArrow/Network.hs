@@ -7,7 +7,7 @@ module ChoreographyArrow.Network where
 import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
-import Control.Arrow.Freer.FreerArrow
+import Control.Arrow.Freer.FreerArrowChoice
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
@@ -28,11 +28,11 @@ data NetworkSig ar b a where
        => LocTm
        -> NetworkSig ar () a
   -- | Broadcasting.
---   BCast :: Show a
---         => NetworkSig ar a ()
+  BCast :: Show a
+        => NetworkSig ar a ()
 
 -- | Monad that represents network programs.
-type Network ar = FreerArrow (NetworkSig ar)
+type Network ar = FreerArrowChoice (NetworkSig ar)
 
 -- * Network operations
 
@@ -49,8 +49,8 @@ recv :: Read a => LocTm -> Network ar () a
 recv l = embed $ Recv l
 
 -- | Broadcast a message to all participants.
--- broadcast :: Show a => Network ar a ()
--- broadcast = embed BCast
+broadcast :: Show a => Network ar a ()
+broadcast = embed BCast
 
 -- * Message transport backends
 

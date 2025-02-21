@@ -8,11 +8,11 @@ module ChoreographyArrow.Choreo where
 import ChoreographyArrow.Location
 import ChoreographyArrow.Network
 import Control.Monad.Freer
-import Control.Arrow.Freer.FreerArrow
+import Control.Arrow.Freer.FreerArrowChoice
 import Data.List
 import Data.Proxy
 import GHC.TypeLits
-import Data.Profunctor (Profunctor)
+import Data.Profunctor
 import Control.Arrow
 import Control.Category
 import Prelude hiding (id, (.))
@@ -37,27 +37,27 @@ data ChoreoSig ar b a where
        -> Proxy l'
        -> ChoreoSig ar (a @ l) (a @ l')
 --TODO
---   Cond :: (Show a, Read a, KnownSymbol l)
---        => Proxy l
---        -> a @ l
---        -> (a -> Choreo m b)
---        -> ChoreoSig m b
+  Cond :: (Show a, Read a, KnownSymbol l)
+       => Proxy l
+       -> Choreo ar a (Either b c)
+       -> ChoreoSig ar (a @ l) (Either b c)
 
 -- | Monad for writing choreographies.
-type Choreo ar = FreerArrow (ChoreoSig ar)
+type Choreo ar = FreerArrowChoice (ChoreoSig ar)
 
 -- | Run a `Choreo` monad directly.
-runChoreo :: (Profunctor ar, Arrow ar) => Choreo ar b a -> ar b a
+runChoreo :: (Profunctor ar, ArrowChoice ar) => Choreo ar b a -> ar b a
 runChoreo = interp handler
   where
-    handler :: (Profunctor ar, Arrow ar) => ChoreoSig ar b a -> ar b a
+    handler :: (Profunctor ar, ArrowChoice ar) => ChoreoSig ar b a -> ar b a
     handler (Local _ ar) = -- wrap <$> m unwrap
-      arr (\x -> (unwrap, x)) >>> ar >>> arr wrap
+      (\x -> (unwrap, x)) ^>> ar >>^ wrap
 
     handler (Comm _ _) = -- return $ (wrap . unwrap) a
-      arr (wrap . unwrap)
+      arr (unwrap >>> wrap)
 
---     handler (Cond _ a c) = runChoreo $ c (unwrap a)
+    handler (Cond _ ar) = -- runChoreo $ c (unwrap a)
+      unwrap ^>> runChoreo ar
 
 -- | Endpoint projection.
 epp :: Choreo ar b a -> LocTm -> Network ar b a
@@ -66,21 +66,21 @@ epp c l' = interp handler c
     handler :: ChoreoSig ar b a -> Network ar b a
     handler (Local l ar)
       | toLocTm l == l' = -- wrap <$> run (m unwrap)
-          arr (\x -> (unwrap, x)) >>> run ar >>> arr wrap
+          (\x -> (unwrap, x)) ^>> run ar >>^ wrap
       | otherwise       = arr (const Empty) -- return Empty
     handler (Comm s r)
       | toLocTm s == toLocTm r = -- return $ wrap (unwrap a)
           arr (wrap . unwrap)
       | toLocTm s == l'        = -- send (unwrap a) (toLocTm r) >> return Empty
-          arr unwrap >>> send (toLocTm r) >>^ const Empty
+          unwrap ^>> send (toLocTm r) >>^ const Empty
       | toLocTm r == l'        = -- wrap <$> recv (toLocTm s)
-          const () ^>> recv (toLocTm s) >>> arr wrap
+          const () ^>> recv (toLocTm s) >>^ wrap
       | otherwise              = arr (const Empty) -- return Empty
 --TODO
---     handler (Cond l a c)
---       | toLocTm l == l' = broadcast (unwrap a) >> epp (c (unwrap a)) l'
---       | otherwise       = recv (toLocTm l) >>= \x -> epp (c x) l'
--- 
+    handler (Cond l c)
+      | toLocTm l == l' = unwrap ^>> (broadcast &&& id) >>> snd ^>> epp c l' -- broadcast (unwrap a) >> epp (c (unwrap a)) l'
+      | otherwise       = const () ^>> recv (toLocTm l) >>> epp c l'
+
 -- * Choreo operations
 
 -- | Perform a local computation at a given location.
