@@ -4,6 +4,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 module Main where
 
@@ -18,12 +19,13 @@ import Control.Arrow
 import Control.Arrow.ArrowIO
 import Control.Category
 import Prelude hiding (id, (.))
-import Control.Arrow.Freer.FreerArrowChoice
+import Control.Arrow.Freer.FreerArrowChoiceL
 import ChoreographyArrow (runChoreography)
 import ChoreographyArrow.Network
 import ChoreographyArrow.Network.Local
 import Data.Bifunctor
 import Control.Concurrent.Async (async, mapConcurrently_, wait)
+import GHC.TypeLits
 
 -- set up proxies
 alice :: Proxy "alice"
@@ -64,6 +66,16 @@ optimization =
 
 optimization_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
 optimization_epp l = epp optimization l
+
+optimization_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
+optimization_run_IO = runChoreo optimization
+
+combine_local :: Choreo ar a b -> Choreo ar a b
+combine_local (Hom f) = Hom f
+combine_local (Comp f (Local l c) (Comp g (Local l' d) k))
+  | symbolVal l == symbolVal l'   = _ -- TODO: I don't know if there's a valid definition that can go here
+  | otherwise = (Comp f (Local l c) (Comp g (Local l' d) k))
+combine_local (Comp f e c) = Comp f e (combine_local c)
 
 main :: IO ()
 main = do
