@@ -23,7 +23,7 @@ import Control.Arrow.Freer.FreerArrowChoiceL
 import ChoreographyArrow (runChoreography)
 import ChoreographyArrow.Network
 import ChoreographyArrow.Network.Local
-import Data.Bifunctor
+import qualified Data.Bifunctor as B
 import Control.Concurrent.Async (async, mapConcurrently_, wait)
 import GHC.TypeLits
 
@@ -44,9 +44,9 @@ optimization =
   alice `locally` arr (const (5 :: Integer)) >>>
   (alice ~> bob) >>>
   bob `locally` arr (const (6 :: Integer)) &&& id >>>
-  arr fst &&& bob `locally` arr (\(unwrap, p) -> uncurry (+) (bimap unwrap unwrap p)) >>>
+  arr fst &&& bob `locally` arr (\(unwrap, p) -> uncurry (+) (B.bimap unwrap unwrap p)) >>>
   (bob ~> alice) *** (bob ~> alice) >>>
-  id &&& alice `locally` (arr (\(unwrap, p) -> bimap unwrap unwrap p) >>> arrIO print) >>>
+  id &&& alice `locally` (arr (\(unwrap, p) -> B.bimap unwrap unwrap p) >>> arrIO print) >>>
   arr fst
 
 -- TODO: Should be able to rewrite (bob ~> alice) *** (bob ~> alice) to only perform one send...
@@ -64,17 +64,23 @@ optimization =
 
 -- (Choreo ar ~> Kleisli IO (Network ar))
 
+optimization_IO :: Choreo (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+optimization_IO = optimization
+
 optimization_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
 optimization_epp l = epp optimization l
+
+optimization_epp_IO :: LocTm -> Network (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+optimization_epp_IO = optimization_epp
 
 optimization_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
 optimization_run_IO = runChoreo optimization
 
 distr_loc :: KnownSymbol l => Unwrap l -> (a, b) @ l -> (a @ l, b @ l)
-distr_loc unwrap = unwrap >>> bimap wrap wrap
+distr_loc unwrap = unwrap >>> B.bimap wrap wrap
 
 factor_loc :: KnownSymbol l => Unwrap l -> (a @ l, b @ l) -> (a, b) @ l
-factor_loc unwrap = bimap unwrap unwrap >>> wrap
+factor_loc unwrap = B.bimap unwrap unwrap >>> wrap
 
 combine_local :: Choreo ar a b -> Choreo ar a b
 combine_local (Hom f) = Hom f
@@ -83,10 +89,11 @@ combine_local (Hom f) = Hom f
 --  | symbolVal l == symbolVal l'   =
 --      Comp _ _ k
 --  | otherwise = (Comp f (Local l c) (Comp g (Local l' d) k))
-combine_local (Comp f (Comm l m) (Comp g (Comm l' m') k))
+combine_local (Comp f (Comm l m)
+               (Comp g (Comm l' m')
+                k))
   | symbolVal l == symbolVal l' && symbolVal m == symbolVal m' =
-      Comp (f >>> g) (Comm l' m') k
-  | otherwise = (Comp f (Comm l m) (Comp g (Comm l' m') k))
+      combine_local $ Comp (f >>> left (B.first (unwrap >>> wrap)) >>> g) (Comm Proxy Proxy) k
 combine_local (Comp f e c) = Comp f e (combine_local c)
 
 main :: IO ()
