@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 -- | This module defines the `Network` monad, which represents programs run on
 -- individual nodes in a distributed system with explicit sends and receives.
 -- To run a `Network` program, we provide a `runNetwork` function that supports
@@ -30,6 +31,12 @@ data NetworkSig ar b a where
   -- | Broadcasting.
   BCast :: Show a
         => NetworkSig ar a ()
+
+instance Show (NetworkSig ar b a) where
+  show (Run _) = "Run"
+  show (Send l) = "(self ~> " ++ l ++ ")"
+  show (Recv l) = "(" ++ l ++ " ~> self)"
+  show BCast = "BCast"
 
 -- | Monad that represents network programs.
 type Network ar = FreerArrowChoiceL (NetworkSig ar)
