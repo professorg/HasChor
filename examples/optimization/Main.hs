@@ -70,11 +70,23 @@ optimization_epp l = epp optimization l
 optimization_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
 optimization_run_IO = runChoreo optimization
 
+distr_loc :: KnownSymbol l => Unwrap l -> (a, b) @ l -> (a @ l, b @ l)
+distr_loc unwrap = unwrap >>> bimap wrap wrap
+
+factor_loc :: KnownSymbol l => Unwrap l -> (a @ l, b @ l) -> (a, b) @ l
+factor_loc unwrap = bimap unwrap unwrap >>> wrap
+
 combine_local :: Choreo ar a b -> Choreo ar a b
 combine_local (Hom f) = Hom f
-combine_local (Comp f (Local l c) (Comp g (Local l' d) k))
-  | symbolVal l == symbolVal l'   = _ -- TODO: I don't know if there's a valid definition that can go here
-  | otherwise = (Comp f (Local l c) (Comp g (Local l' d) k))
+-- TODO: I don't think this branch is possible
+--combine_local (Comp f (Local l c) (Comp g (Local l' d) k))
+--  | symbolVal l == symbolVal l'   =
+--      Comp _ _ k
+--  | otherwise = (Comp f (Local l c) (Comp g (Local l' d) k))
+combine_local (Comp f (Comm l m) (Comp g (Comm l' m') k))
+  | symbolVal l == symbolVal l' && symbolVal m == symbolVal m' =
+      Comp (f >>> g) (Comm l' m') k
+  | otherwise = (Comp f (Comm l m) (Comp g (Comm l' m') k))
 combine_local (Comp f e c) = Comp f e (combine_local c)
 
 main :: IO ()
