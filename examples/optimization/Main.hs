@@ -20,7 +20,7 @@ import Control.Category
 import Prelude hiding (id, (.))
 import Control.Arrow.Freer.FreerArrowChoice
 import ChoreographyArrow (runChoreography)
-import ChoreographyArrow.Network (Backend)
+import ChoreographyArrow.Network
 import ChoreographyArrow.Network.Local
 import Data.Bifunctor
 import Control.Concurrent.Async (async, mapConcurrently_, wait)
@@ -48,6 +48,22 @@ optimization =
   arr fst
 
 -- TODO: Should be able to rewrite (bob ~> alice) *** (bob ~> alice) to only perform one send...
+-- (bob ~> alice) *** (bob ~> alice)
+--  =
+-- (bob ~> alice) >>> (arr (\(unwrap, p) -> let (x, y) = (unwrap p) in (wrap x, wrap y)))
+--
+-- (a @ "alice", b @ "alice") = ((a, b) @ "alice")
+--
+-- first (bob ~> alice) >>>
+-- arr (\(x, y) -> (y, x)) >>>
+-- first (bob ~> alice)
+
+--TODO: Write different interpretations paths for this
+
+-- (Choreo ar ~> Kleisli IO (Network ar))
+
+optimization_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
+optimization_epp l = epp optimization l
 
 main :: IO ()
 main = do

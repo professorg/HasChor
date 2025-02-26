@@ -7,7 +7,7 @@ module ChoreographyArrow.Network where
 import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
-import Control.Arrow.Freer.FreerArrowChoice
+import Control.Arrow.Freer.FreerArrowChoiceL
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
@@ -32,7 +32,7 @@ data NetworkSig ar b a where
         => NetworkSig ar a ()
 
 -- | Monad that represents network programs.
-type Network ar = FreerArrowChoice (NetworkSig ar)
+type Network ar = FreerArrowChoiceL (NetworkSig ar)
 
 -- * Network operations
 
