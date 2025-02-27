@@ -19,6 +19,7 @@ import Data.Profunctor ( Strong, Profunctor(lmap) )
 import Control.Arrow
 import Control.Arrow.ArrowIO
 import Control.Category
+import Control.Monad
 import Prelude hiding (id, (.))
 import Control.Arrow.Freer.FreerArrow
 import ChoreographyArrow
@@ -28,6 +29,7 @@ import qualified Data.Bifunctor as B
 import Control.Concurrent.Async (async, mapConcurrently_, wait)
 import GHC.TypeLits
 import Data.Tuple
+import Data.Bitraversable
 
 -- set up proxies
 alice :: Proxy "alice"
@@ -90,15 +92,33 @@ distr_unwrap (uw, (a, b)) = ((uw, a), (uw, b))
 setup_err :: a
 setup_err = error $ "Dummy value"
 
+newtype AtLoc (l :: LocTy) a = AtLoc { unLoc :: a @ l }
+
+instance KnownSymbol l => Functor (AtLoc l) where
+  fmap f (AtLoc (Wrap x)) = AtLoc (Wrap (f x))
+  fmap f (AtLoc Empty) = AtLoc Empty
+
+instance KnownSymbol l => Applicative (AtLoc l) where
+  pure = AtLoc . Wrap
+  (<*>) = ap
+
+instance KnownSymbol l => Monad (AtLoc l) where
+  return = pure
+  (AtLoc (Wrap x)) >>= k = k x
+  (AtLoc Empty) >>= k = AtLoc Empty
+
+
 optimize' :: Arrow ar => Choreo ar a b -> (Choreo ar a b, Bool)
 
 optimize' (Hom f) = (Hom f, False)
+
+-- This isn't possible with the current types
 -- optimize' (Comp f (Local (l :: Proxy l) c) (Comp g (Local (l' :: Proxy l') d) k))
 --   | isJust (eqT @l @l') =
 --     case (eqT @l @l') of
 --       Just Refl ->
 --         (,True) $
---         fst . optimize' $
+--         optimize $
 --         Comp
 --           (f >>> arr (,()))
 --           (Local l (
@@ -107,9 +127,9 @@ optimize' (Hom f) = (Hom f, False)
 --               arr unassoc >>>
 --               first (arr g) >>>
 --               arr (swap >>> unassoc) >>>
---               first (d >>> arr wrap)
+--               first d
 --           )) $
---         lmap (fst >>> unwrap) $ -- But not this? [2]
+--         lmap _ $
 --         k
 
 optimize' (Comp f (Comm (l :: Proxy l) (l' :: Proxy l'))
@@ -119,22 +139,16 @@ optimize' (Comp f (Comm (l :: Proxy l) (l' :: Proxy l'))
     case (eqT @l @m, eqT @l' @m') of
       (Just Refl, Just Refl) ->
         (,True) $
-        fst . optimize' $
-        Comp
-          (
-            f >>>
-            (\(a, c) -> ((setup_err, c), (a, c))) >>>
-            first g >>>
-            (\((a4, _), (a2, c)) -> ((a2, a4), c))
-          )
-          (Local l $ arr $ uncurry factor_loc) $
-        Comp id (Comm l l') $
-        Comp (,()) (Local l' $ arr $ \(unwrap, (p, c)) ->
-                       let (a2, a4) = unwrap p
-                           (_, c1) = g (wrap a2, c)
-                       in
-                         (wrap a4, c1)) $
-        lmap (fst >>> unwrap) $ -- Why can I do this? [1]
+        optimize $
+        Comp (
+          f >>>
+          (\(a2, c) -> (unLoc $ bisequence (AtLoc a2, AtLoc $ fst $ g (setup_err, c)), c))
+        ) (Comm l l') $
+        lmap (
+          (\(p, c) -> ((unLoc $ fst <$> AtLoc p, unLoc $ snd <$> AtLoc p), c)) >>>
+          (\((a2, a4), c) -> (g (a2, c), a4)) >>>
+          (\((_, c), a4) -> (a4, c))
+        ) $
         k
 
 optimize' (Comp f e c) =
