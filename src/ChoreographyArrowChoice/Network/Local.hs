@@ -1,10 +1,10 @@
 {-# LANGUAGE GADTs #-}
 
 -- | This module defines the multi-thread backend for the `Network` monad.
-module ChoreographyArrow.Network.Local where
+module ChoreographyArrowChoice.Network.Local where
 
-import ChoreographyArrow.Location
-import ChoreographyArrow.Network
+import ChoreographyArrowChoice.Location
+import ChoreographyArrowChoice.Network
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Monad
@@ -13,7 +13,7 @@ import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
 import Control.Arrow.ArrowIO
-import Control.Arrow.Freer.FreerArrowL
+import Control.Arrow.Freer.FreerArrowChoiceL
 import Data.Profunctor (Profunctor)
 import Control.Arrow
 import ArrowIOKleisli
@@ -50,6 +50,8 @@ runNetworkLocal cfg self prog = runKleisli $ interp handler prog
     handler (Run ar) = ar
     handler (Send l) = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
     handler (Recv l) = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
+    handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
+      Kleisli $ \x -> mapM_ (\l -> runKleisli (handler $ Send l) x) (locs cfg)
 
 instance Backend LocalConfig where
   runNetwork = runNetworkLocal

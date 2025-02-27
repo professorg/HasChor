@@ -10,22 +10,24 @@ module Main where
 
 import ChoreographyArrow.Choreo
 import ChoreographyArrow.Location
-import Data.Proxy
+import Data.Maybe
+import Data.Typeable
 import Data.Time
 import System.Environment
 import System.Random
-import Data.Profunctor (Profunctor, Strong, first', second')
+import Data.Profunctor ( Strong, Profunctor(lmap) )
 import Control.Arrow
 import Control.Arrow.ArrowIO
 import Control.Category
 import Prelude hiding (id, (.))
-import Control.Arrow.Freer.FreerArrowChoiceL
-import ChoreographyArrow (runChoreography)
+import Control.Arrow.Freer.FreerArrowL
+import ChoreographyArrow
 import ChoreographyArrow.Network
 import ChoreographyArrow.Network.Local
 import qualified Data.Bifunctor as B
 import Control.Concurrent.Async (async, mapConcurrently_, wait)
 import GHC.TypeLits
+import Data.Tuple
 
 -- set up proxies
 alice :: Proxy "alice"
@@ -37,8 +39,8 @@ bob = Proxy
 discard :: Arrow ar => ar b ()
 discard = arr (const ())
 
-optimization :: (ArrowIO ar, Strong ar) => Choreo ar () (Integer @ "alice", Integer @ "alice")
-optimization =
+choreo :: (ArrowIO ar, Strong ar) => Choreo ar () (Integer @ "alice", Integer @ "alice")
+choreo =
   -- wait for alice to initiate the process
   discard >>>
   alice `locally` arr (const (5 :: Integer)) >>>
@@ -64,43 +66,113 @@ optimization =
 
 -- (Choreo ar ~> Kleisli IO (Network ar))
 
-optimization_IO :: Choreo (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
-optimization_IO = optimization
+choreo_IO :: Choreo (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+choreo_IO = choreo
 
-optimization_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
-optimization_epp l = epp optimization l
+choreo_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
+choreo_epp = epp choreo
 
-optimization_epp_IO :: LocTm -> Network (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
-optimization_epp_IO = optimization_epp
+choreo_epp_IO :: LocTm -> Network (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+choreo_epp_IO = choreo_epp
 
-optimization_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
-optimization_run_IO = runChoreo optimization
+choreo_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
+choreo_run_IO = runChoreo choreo
 
 distr_loc :: KnownSymbol l => Unwrap l -> (a, b) @ l -> (a @ l, b @ l)
 distr_loc unwrap = unwrap >>> B.bimap wrap wrap
 
-factor_loc :: KnownSymbol l => Unwrap l -> (a @ l, b @ l) -> (a, b) @ l
-factor_loc unwrap = B.bimap unwrap unwrap >>> wrap
+factor_loc :: KnownSymbol l => Unwrap l -> (a @ l, b @ l) -> (a, b)
+factor_loc unwrap = B.bimap unwrap unwrap
 
-combine_local :: Choreo ar a b -> Choreo ar a b
-combine_local (Hom f) = Hom f
--- TODO: I don't think this branch is possible
---combine_local (Comp f (Local l c) (Comp g (Local l' d) k))
---  | symbolVal l == symbolVal l'   =
---      Comp _ _ k
---  | otherwise = (Comp f (Local l c) (Comp g (Local l' d) k))
-combine_local (Comp f (Comm l m)
-               (Comp g (Comm l' m')
-                k))
-  | symbolVal l == symbolVal l' && symbolVal m == symbolVal m' =
-      combine_local $ Comp (f >>> left (B.first (unwrap >>> wrap)) >>> g) (Comm Proxy Proxy) k
-combine_local (Comp f e c) = Comp f e (combine_local c)
+distr_unwrap :: KnownSymbol l => (Unwrap l, (a, b)) -> ((Unwrap l, a), (Unwrap l, b))
+distr_unwrap (uw, (a, b)) = ((uw, a), (uw, b))
 
-main :: IO ()
-main = do
+setup_err :: a
+setup_err = error $ "Dummy value"
+
+optimize' :: Arrow ar => Choreo ar a b -> (Choreo ar a b, Bool)
+
+optimize' (Hom f) = (Hom f, False)
+-- optimize' (Comp f (Local (l :: Proxy l) c) (Comp g (Local (l' :: Proxy l') d) k))
+--   | isJust (eqT @l @l') =
+--     case (eqT @l @l') of
+--       Just Refl ->
+--         (,True) $
+--         fst . optimize' $
+--         Comp
+--           (f >>> arr (,()))
+--           (Local l (
+--               arr distr_unwrap >>>
+--               ((c >>> arr wrap) *** arr swap) >>>
+--               arr unassoc >>>
+--               first (arr g) >>>
+--               arr (swap >>> unassoc) >>>
+--               first (d >>> arr wrap)
+--           )) $
+--         lmap (fst >>> unwrap) $ -- But not this? [2]
+--         k
+
+optimize' (Comp f (Comm (l :: Proxy l) (l' :: Proxy l'))
+          (Comp g (Comm (m :: Proxy m) (m' :: Proxy m'))
+           k))
+  | isJust (eqT @l @m) && isJust (eqT @l' @m') =
+    case (eqT @l @m, eqT @l' @m') of
+      (Just Refl, Just Refl) ->
+        (,True) $
+        fst . optimize' $
+        Comp
+          (
+            f >>>
+            (\(a, c) -> ((setup_err, c), (a, c))) >>>
+            first g >>>
+            (\((a4, _), (a2, c)) -> ((a2, a4), c))
+          )
+          (Local l $ arr $ uncurry factor_loc) $
+        Comp id (Comm l l') $
+        Comp (,()) (Local l' $ arr $ \(unwrap, (p, c)) ->
+                       let (a2, a4) = unwrap p
+                           (_, c1) = g (wrap a2, c)
+                       in
+                         (wrap a4, c1)) $
+        lmap (fst >>> unwrap) $ -- Why can I do this? [1]
+        k
+
+optimize' (Comp f e c) =
+  let
+    c' = optimize' c
+    (d, b) = c'
+  in
+    if b then
+      optimize' $ Comp f e d
+    else
+      (,False) $ Comp f e d
+
+optimize :: Arrow ar => Choreo ar a b -> Choreo ar a b
+optimize = fst . optimize'
+
+choreo_opt :: (ArrowIO ar, Strong ar) => Choreo ar () (Integer @ "alice", Integer @ "alice")
+choreo_opt = optimize choreo
+
+choreo_opt_IO :: Choreo (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+choreo_opt_IO = choreo_opt
+
+choreo_opt_epp :: (ArrowIO ar, Strong ar) => LocTm -> Network ar () (Integer @ "alice", Integer @ "alice")
+choreo_opt_epp = epp choreo_opt
+
+choreo_opt_epp_IO :: LocTm -> Network (Kleisli IO) () (Integer @ "alice", Integer @ "alice")
+choreo_opt_epp_IO = choreo_opt_epp
+
+choreo_opt_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
+choreo_opt_run_IO = runChoreo choreo_opt
+
+main' :: Choreo (Kleisli IO) () (Integer @ "alice", Integer @ "alice") -> IO ()
+main' c = do
   config <- mkLocalConfig locs
-  mapConcurrently_ (\l -> runChoreography config optimization l ()) locs
+  mapConcurrently_ (\l -> runChoreography config c l ()) locs
   return ()
   where
     locs = ["alice", "bob"]
+
+main :: IO ()
+main = main' choreo
 

@@ -1,0 +1,47 @@
+{-# LANGUAGE ExplicitNamespaces #-}
+
+-- | This module defines the interface to HasChor. The client of the library is
+-- highly recommended to only use constructs exported by this module.
+module ChoreographyArrowChoice (
+  -- * Locations and Located Values
+  LocTm,
+  LocTy,
+  type (@),
+  mkLoc,
+
+  -- * The Choreo monad
+  Choreo,
+  -- ** Choreo operations
+  locally,
+  (~>),
+  (~~>),
+--   cond,
+--   cond',
+
+  -- * Message transport backends
+  -- ** The HTTP backend
+  Host,
+  Port,
+  HttpConfig,
+  mkHttpConfig,
+
+  -- * Running choreographies
+  runChoreo,
+  runChoreography
+  ) where
+
+import ChoreographyArrowChoice.Location
+import ChoreographyArrowChoice.Choreo
+import ChoreographyArrowChoice.Network
+import ChoreographyArrowChoice.Network.Http
+import ChoreographyArrowChoice.Network.Local
+import Control.Monad.IO.Class
+import Data.Proxy
+import Control.Arrow.ArrowIO (ArrowIO)
+import Data.Profunctor (Profunctor)
+import Control.Arrow (Kleisli)
+
+--TODO
+-- | Run a choreography with a message transport backend.
+runChoreography :: (Backend config, MonadIO m) => config -> Choreo (Kleisli m) b a -> LocTm -> b -> m a
+runChoreography cfg choreo l = runNetwork cfg l (epp choreo l)

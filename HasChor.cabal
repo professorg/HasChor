@@ -45,9 +45,14 @@ library
         ChoreographyArrow.Network
         ChoreographyArrow.Network.Http
         ChoreographyArrow.Network.Local
+        ChoreographyArrowChoice
+        ChoreographyArrowChoice.Choreo
+        ChoreographyArrowChoice.Location
+        ChoreographyArrowChoice.Network
+        ChoreographyArrowChoice.Network.Http
+        ChoreographyArrowChoice.Network.Local
+        ArrowIOKleisli
         Control.Monad.Freer
-        --Control.Arrow.FreerArrow
-        --Control.Arrow.FreerArrowChoice
     build-depends:
                     base                 >= 4.16 && < 4.20
                   , bytestring           >= 0.11 && < 0.13

@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 
 -- | This module defines locations and located values.
-module ChoreographyArrow.Location where
+module ChoreographyArrowChoice.Location where
 
-import Data.Typeable
+import Data.Proxy
 import Data.String
 import GHC.TypeLits
 import Language.Haskell.TH

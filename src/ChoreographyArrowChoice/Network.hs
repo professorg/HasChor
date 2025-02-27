@@ -3,12 +3,12 @@
 -- individual nodes in a distributed system with explicit sends and receives.
 -- To run a `Network` program, we provide a `runNetwork` function that supports
 -- multiple message transport backends.
-module ChoreographyArrow.Network where
+module ChoreographyArrowChoice.Network where
 
-import ChoreographyArrow.Location
+import ChoreographyArrowChoice.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
-import Control.Arrow.Freer.FreerArrowL
+import Control.Arrow.Freer.FreerArrowChoiceL
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
@@ -28,14 +28,18 @@ data NetworkSig ar b a where
   Recv :: Read a
        => LocTm
        -> NetworkSig ar () a
+  -- | Broadcasting.
+  BCast :: Show a
+        => NetworkSig ar a ()
 
 instance Show (NetworkSig ar b a) where
   show (Run _) = "Run"
   show (Send l) = "(self ~> " ++ l ++ ")"
   show (Recv l) = "(" ++ l ++ " ~> self)"
+  show BCast = "BCast"
 
 -- | Monad that represents network programs.
-type Network ar = FreerArrowL (NetworkSig ar)
+type Network ar = FreerArrowChoiceL (NetworkSig ar)
 
 -- * Network operations
 
@@ -50,6 +54,10 @@ send l = embed $ Send l
 -- | Receive a message from a sender.
 recv :: Read a => LocTm -> Network ar () a
 recv l = embed $ Recv l
+
+-- | Broadcast a message to all participants.
+broadcast :: Show a => Network ar a ()
+broadcast = embed BCast
 
 -- * Message transport backends
 

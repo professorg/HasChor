@@ -4,10 +4,10 @@
 
 -- | This module implments the HTTP message transport backend for the `Network`
 -- monad.
-module ChoreographyArrow.Network.Http where
+module ChoreographyArrowChoice.Network.Http where
 
-import ChoreographyArrow.Location
-import ChoreographyArrow.Network hiding (run)
+import ChoreographyArrowChoice.Location
+import ChoreographyArrowChoice.Network hiding (run)
 import Data.ByteString (fromStrict)
 import Data.Proxy (Proxy(..))
 import Data.HashMap.Strict (HashMap, (!))
@@ -23,7 +23,7 @@ import Control.Monad
 import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Control.Arrow.ArrowIO
-import Control.Arrow.Freer.FreerArrowL
+import Control.Arrow.Freer.FreerArrowChoiceL
 import Control.Arrow
 import Control.Category
 import Data.Profunctor
@@ -98,6 +98,8 @@ runNetworkHttp cfg self prog b = do
             Left err -> putStrLn $ "Error : " ++ show err
             Right _  -> return ()
         handler mgr chans (Recv l) = Kleisli $ \() -> liftIO $ read <$> readChan (chans ! l) -- liftIO $ read <$> readChan (chans ! l)
+        handler mgr chans BCast    = Kleisli $ \x -> do -- mapM_ (handler mgr chans) $ fmap Send (locs cfg)
+          mapM_ (\l -> runKleisli (handler mgr chans (Send l)) x) $ locs cfg
 
     api :: Proxy API
     api = Proxy
