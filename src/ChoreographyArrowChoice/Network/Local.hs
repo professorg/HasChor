@@ -13,7 +13,7 @@ import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap, (!))
 import Data.HashMap.Strict qualified as HashMap
 import Control.Arrow.ArrowIO
-import Control.Arrow.Freer.FreerArrowChoiceL
+import Control.Arrow.Freer.FreerChoiceArrow
 import Data.Profunctor (Profunctor)
 import Control.Arrow
 import ArrowIOKleisli

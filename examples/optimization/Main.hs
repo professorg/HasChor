@@ -20,7 +20,7 @@ import Control.Arrow
 import Control.Arrow.ArrowIO
 import Control.Category
 import Prelude hiding (id, (.))
-import Control.Arrow.Freer.FreerArrowL
+import Control.Arrow.Freer.FreerArrow
 import ChoreographyArrow
 import ChoreographyArrow.Network
 import ChoreographyArrow.Network.Local

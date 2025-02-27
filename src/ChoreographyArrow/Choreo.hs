@@ -8,7 +8,7 @@ module ChoreographyArrow.Choreo where
 import ChoreographyArrow.Location
 import ChoreographyArrow.Network
 import Control.Monad.Freer
-import Control.Arrow.Freer.FreerArrowL
+import Control.Arrow.Freer.FreerArrow
 import Data.List
 import Data.Typeable
 import GHC.TypeLits
@@ -42,7 +42,7 @@ instance Show (ChoreoSig ar b a) where
   show (Comm l l') = "(" ++ symbolVal l ++ " ~> " ++ symbolVal l' ++ ")"
 
 -- | Monad for writing choreographies.
-type Choreo ar = FreerArrowL (ChoreoSig ar)
+type Choreo ar = FreerArrow (ChoreoSig ar)
 
 -- | Run a `Choreo` monad directly.
 runChoreo :: (Profunctor ar, Arrow ar) => Choreo ar b a -> ar b a
