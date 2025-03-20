@@ -7,6 +7,7 @@ import Data.Typeable
 import Data.String
 import GHC.TypeLits
 import Language.Haskell.TH
+import Control.Monad
 
 -- | Term-level locations.
 type LocTm = String
@@ -25,6 +26,22 @@ data a @ (l :: LocTy)
   = Wrap a -- ^ A located value @a \@ l@ from location @l@'s perspective.
   | Empty  -- ^ A located value @a \@ l@ from locations other than @l@'s
            -- perspective.
+  deriving Show
+
+newtype AtLoc (l :: LocTy) a = AtLoc { unLoc :: a @ l }
+
+instance KnownSymbol l => Functor (AtLoc l) where
+  fmap f (AtLoc (Wrap x)) = AtLoc (Wrap (f x))
+  fmap f (AtLoc Empty) = AtLoc Empty
+
+instance KnownSymbol l => Applicative (AtLoc l) where
+  pure = AtLoc . Wrap
+  (<*>) = ap
+
+instance KnownSymbol l => Monad (AtLoc l) where
+  return = pure
+  (AtLoc (Wrap x)) >>= k = k x
+  (AtLoc Empty) >>= k = AtLoc Empty
 
 -- | Wrap a value as a located value.
 wrap :: a -> a @ l

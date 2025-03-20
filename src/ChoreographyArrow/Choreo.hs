@@ -29,8 +29,8 @@ type Unwrap l = forall a. a @ l -> a
 data ChoreoSig ar b a where
   Local :: KnownSymbol l
         => Proxy l
-        -> ar (Unwrap l, b) a
-        -> ChoreoSig ar b (a @ l)
+        -> ar b a
+        -> ChoreoSig ar (b @ l) (a @ l)
 
   Comm :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
        => Proxy l
@@ -50,7 +50,7 @@ runChoreo = interp handler
   where
     handler :: (Profunctor ar, Arrow ar) => ChoreoSig ar b a -> ar b a
     handler (Local _ ar) = -- wrap <$> m unwrap
-      (\x -> (unwrap, x)) ^>> ar >>^ wrap
+      unwrap ^>> ar >>^ wrap
 
     handler (Comm _ _) = -- return $ (wrap . unwrap) a
       arr (unwrap >>> wrap)
@@ -62,7 +62,7 @@ epp c l' = interp handler c
     handler :: ChoreoSig ar b a -> Network ar b a
     handler (Local l ar)
       | toLocTm l == l' = -- wrap <$> run (m unwrap)
-          (\x -> (unwrap, x)) ^>> run ar >>^ wrap
+          unwrap ^>> run ar >>^ wrap
       | otherwise       = arr (const Empty) -- return Empty
     handler (Comm s r)
       | toLocTm s == toLocTm r = -- return $ wrap (unwrap a)
@@ -75,15 +75,27 @@ epp c l' = interp handler c
 
 -- * Choreo operations
 
+discard :: Arrow ar => ar b ()
+discard = arr (const ())
+
 -- | Perform a local computation at a given location.
 locally :: KnownSymbol l
         => Proxy l           -- ^ Location performing the local computation.
 --         -> (Unwrap l -> m a) -- ^ The local computation given a constrained
 --                              -- unwrap funciton.
 --         -> Choreo m (a @ l)
-        -> ar (Unwrap l, b) a
-        -> Choreo ar b (a @ l)
+        -> ar b a
+        -> Choreo ar (b @ l) (a @ l)
 locally l ar = embed (Local l ar)
+
+locally0 :: KnownSymbol l
+        => Proxy l           -- ^ Location performing the local computation.
+--         -> (Unwrap l -> m a) -- ^ The local computation given a constrained
+--                              -- unwrap funciton.
+--         -> Choreo m (a @ l)
+        -> ar () a
+        -> Choreo ar b (a @ l)
+locally0 l ar = discard >>> arr wrap >>> locally l ar
 
 -- | Communication between a sender and a receiver.
 (~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
@@ -94,8 +106,8 @@ locally l ar = embed (Local l ar)
 
 -- | A variant of `~>` that sends the result of a local computation.
 (~~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
-      => (Proxy l, ar (Unwrap l, b) a)
+      => (Proxy l, ar b a)
       -> Proxy l'
-      -> Choreo ar b (a @ l')
+      -> Choreo ar (b @ l) (a @ l')
 (~~>) (l, ar) l' = l `locally` ar >>> (l ~> l')
 

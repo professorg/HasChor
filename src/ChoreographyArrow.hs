@@ -8,11 +8,15 @@ module ChoreographyArrow (
   LocTy,
   type (@),
   mkLoc,
+  AtLoc,
+  unLoc,
 
   -- * The Choreo monad
   Choreo,
   -- ** Choreo operations
+  discard,
   locally,
+  locally0,
   (~>),
   (~~>),
 --   cond,

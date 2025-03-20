@@ -20,6 +20,7 @@ import Prelude hiding (id, (.))
 import Control.Arrow.Freer.FreerChoiceArrow
 import ChoreographyArrow (mkHttpConfig, runChoreography)
 import ChoreographyArrow.Network (Backend)
+import GHC.TypeLits
 
 -- helper functions around prime number
 -- https://nulldereference.wordpress.com/2012/02/04/generating-prime-numbers-with-haskell/
@@ -40,22 +41,20 @@ alice = Proxy
 bob :: Proxy "bob"
 bob = Proxy
 
-discard :: Arrow ar => ar b ()
-discard = arr (const ())
-
-aliceWait :: ArrowIO ar => Choreo ar () (() @ "alice")
+aliceWait :: ArrowIO ar => Choreo ar () ()
 aliceWait =
-  alice `locally` (
+  alice `locally0` (
       arrIO0 (putStrLn "enter to start key exchange...") >>>
-      arrIO0 getLine >>>
-      discard
-    )
+      arrIO0 getLine
+    ) >>>
+  discard
 
-bobWait :: ArrowIO ar => Choreo ar () (() @ "bob")
+bobWait :: ArrowIO ar => Choreo ar () ()
 bobWait =
-  bob `locally` (
+  bob `locally0` (
     arrIO0 (putStrLn "waiting for alice to initiate key exchange")
-    )
+    ) >>>
+  discard
 
 genSecret' :: ArrowIO ar => ar () Integer
 genSecret' = arrIO0 (randomRIO (200, 1000 :: Integer))
@@ -63,13 +62,33 @@ genSecret' = arrIO0 (randomRIO (200, 1000 :: Integer))
 genSecret :: ArrowIO ar => ar b Integer
 genSecret = discard >>> genSecret'
 
+atAlice :: a @ alice -> AtLoc alice a
+atAlice = AtLoc
+
+atBob :: a @ bob -> AtLoc bob a
+atBob = AtLoc
+
+pack :: KnownSymbol l => a @ l -> b @ l -> (a, b) @ l
+pack x y = unLoc $ (,) <$> AtLoc x <*> AtLoc y
+
+unpack :: KnownSymbol l => (a, b) @ l -> (a @ l, b @ l)
+unpack p = (unLoc $ fst <$> AtLoc p, unLoc $ snd <$> AtLoc p)
+
+pack3 :: KnownSymbol l => a @ l -> b @ l -> c @ l -> (a, b, c) @ l
+pack3 x y z = unLoc $ (,,) <$> AtLoc x <*> AtLoc y <*> AtLoc z
+
+unpack3 :: KnownSymbol l => (a, b, c) @ l -> (a @ l, b @ l, c @ l)
+unpack3 p = (unLoc $ (\(x, _, _) -> x) <$> AtLoc p
+            ,unLoc $ (\(_, x, _) -> x) <$> AtLoc p
+            ,unLoc $ (\(_, _, x) -> x) <$> AtLoc p)
+
 diffieHellman :: (ArrowIO ar, Strong ar) => Choreo ar () (Integer @ "alice", Integer @ "bob")
 diffieHellman = proc () -> do
   -- wait for alice to initiate the process
   aliceWait -< ()
   bobWait -< ()
 
-  pa <- alice `locally` (
+  pa <- alice `locally0` (
       arrIO0 (randomRIO (200, 1000 :: Int)) >>>
       arr (primeNums !! )
     ) -< ()
@@ -77,45 +96,45 @@ diffieHellman = proc () -> do
   pb <- (alice ~> bob) -< pa
 
   ga <- (alice `locally` (
-      arr (\(unwrap, pa) -> (10, unwrap pa)) >>>
+      arr (10,) >>>
       arrIO randomRIO
     )) -< pa
 
   gb <-  (alice ~> bob) -< ga
 
-  a <- (alice `locally` genSecret) -< ()
+  a <- (alice `locally` genSecret) -< wrap ()
 
-  b <- (bob `locally` genSecret) -< ()
+  b <- (bob `locally` genSecret) -< wrap ()
 
-  a' <- (alice `locally` (
-      arr (\(unwrap, (ga, a, pa)) -> unwrap ga ^ unwrap a `mod` unwrap pa)
-    )) -< (ga, a, pa)
+  a' <- alice `locally`
+    arr (\(ga, a, pa) -> ga ^ a `mod` pa
+    ) -< pack3 ga a pa
 
-  b' <- (bob `locally` (
-      arr (\(unwrap, (gb, b, pb)) -> unwrap gb ^ unwrap b `mod` unwrap pb)
-    )) -< (gb, b, pb)
+  b' <- bob `locally`
+    arr (\(gb, b, pb) -> gb ^ b `mod` pb
+    ) -< pack3 gb b pb
 
   a'' <-  (alice ~> bob) -< a'
 
   b'' <- (bob ~> alice) -< b'
 
-  s1 <- (alice `locally` (proc (unwrap, (b'', a, pa)) -> do
-      s <- arr (\(unwrap, (b'', a, pa)) -> unwrap b'' ^ unwrap a `mod` unwrap pa) -< (unwrap, (b'', a, pa))
+  s1 <- (alice `locally` (proc (b'', a, pa) -> do
+      s <- arr (\(b'', a, pa) -> b'' ^ a `mod` pa) -< (b'', a, pa)
       (
           arr (\s -> "alice's shared key: " ++ show s) >>>
           arrIO putStrLn
         ) -< s
       returnA -< s
-    )) -< (b'', a, pa)
+    )) -< pack3 b'' a pa
 
-  s2 <- (bob `locally` (proc (unwrap, (b'', a, pa)) -> do
-      s <- arr (\(unwrap, (a'', b, pb)) -> unwrap a'' ^ unwrap b `mod` unwrap pb) -< (unwrap, (b'', a, pa))
+  s2 <- (bob `locally` (proc (a'', b, pb) -> do
+      s <- arr (\(a'', b, pb) -> a'' ^ b `mod` pb) -< (a'', b, pb)
       (
           arr (\s -> "bob's shared key: " ++ show s) >>>
           arrIO putStrLn
         ) -< s
       returnA -< s
-    )) -< (a'', b, pb)
+    )) -< pack3 a'' b pb
 
   returnA -< (s1, s2)
 
