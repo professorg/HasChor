@@ -8,7 +8,7 @@ module ChoreographyArrow.Choreo where
 import ChoreographyArrow.Location
 import ChoreographyArrow.Network
 import Control.Monad.Freer
-import Control.Arrow.Freer.FreerArrow
+import Control.Arrow.Freer.FreerArrowRouter
 import Data.List
 import Data.Typeable
 import GHC.TypeLits
@@ -45,7 +45,7 @@ instance Show (ChoreoSig ar b a) where
 type Choreo ar = FreerArrow (ChoreoSig ar)
 
 -- | Run a `Choreo` monad directly.
-runChoreo :: (Profunctor ar, Arrow ar) => Choreo ar b a -> ar b a
+runChoreo :: (Strong ar, Profunctor ar, Arrow ar) => Choreo ar b a -> ar b a
 runChoreo = interp handler
   where
     handler :: (Profunctor ar, Arrow ar) => ChoreoSig ar b a -> ar b a

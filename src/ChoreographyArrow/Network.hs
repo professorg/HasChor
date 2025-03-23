@@ -8,7 +8,7 @@ module ChoreographyArrow.Network where
 import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
-import Control.Arrow.Freer.FreerArrow
+import Control.Arrow.Freer.FreerArrowRouter
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
