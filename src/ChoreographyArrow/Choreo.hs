@@ -9,6 +9,7 @@ import ChoreographyArrow.Location
 import ChoreographyArrow.Network
 import Control.Monad.Freer
 import Control.Arrow.Freer.FreerArrowRouter
+import Control.Arrow.Freer.Router
 import Data.List
 import Data.Typeable
 import GHC.TypeLits
@@ -85,7 +86,7 @@ locally :: KnownSymbol l
 --                              -- unwrap funciton.
 --         -> Choreo m (a @ l)
         -> ar b a
-        -> Choreo ar (b @ l) (a @ l)
+        -> Choreo ar (b @ l) (Tainted (a @ l))
 locally l ar = embed (Local l ar)
 
 locally0 :: KnownSymbol l
@@ -94,20 +95,20 @@ locally0 :: KnownSymbol l
 --                              -- unwrap funciton.
 --         -> Choreo m (a @ l)
         -> ar () a
-        -> Choreo ar b (a @ l)
+        -> Choreo ar b (Tainted (a @ l))
 locally0 l ar = discard >>> arr wrap >>> locally l ar
 
 -- | Communication between a sender and a receiver.
 (~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
         => Proxy l
         -> Proxy l'
-        -> Choreo ar (a @ l) (a @ l')
+        -> Choreo ar (a @ l) (Tainted (a @ l'))
 (~>) l l' = embed (Comm l l')
 
 -- | A variant of `~>` that sends the result of a local computation.
 (~~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
       => (Proxy l, ar b a)
       -> Proxy l'
-      -> Choreo ar (b @ l) (a @ l')
-(~~>) (l, ar) l' = l `locally` ar >>> (l ~> l')
+      -> Choreo ar (b @ l) (Tainted (a @ l'))
+(~~>) (l, ar) l' = l `locally` ar >>> clean >>> (l ~> l')
 

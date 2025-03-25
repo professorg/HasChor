@@ -9,6 +9,7 @@ import ChoreographyArrow.Location
 import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Control.Arrow.Freer.FreerArrowRouter
+import Control.Arrow.Freer.Router
 import Control.Arrow.ArrowIO
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
@@ -40,15 +41,15 @@ type Network ar = FreerArrow (NetworkSig ar)
 -- * Network operations
 
 -- | Perform a local computation.
-run :: ar b a -> Network ar b a
+run :: ar b a -> Network ar b (Tainted a)
 run ar = embed $ Run ar
 
 -- | Send a message to a receiver.
-send :: Show a => LocTm -> Network ar a ()
+send :: Show a => LocTm -> Network ar a (Tainted ())
 send l = embed $ Send l
 
 -- | Receive a message from a sender.
-recv :: Read a => LocTm -> Network ar () a
+recv :: Read a => LocTm -> Network ar () (Tainted a)
 recv l = embed $ Recv l
 
 -- * Message transport backends
