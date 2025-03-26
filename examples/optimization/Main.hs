@@ -215,7 +215,7 @@ choreo_opt_run_IO :: Kleisli IO () (Integer @ "alice", Integer @ "alice")
 choreo_opt_run_IO = runChoreo choreo_opt
 
 count_send_recv :: Network ar a b -> (Integer, Integer)
-count_send_recv (Comp f e k) =
+count_send_recv (Comp _ e k) =
   let (s, r) = count_send_recv k in
     case e of
       Send _ -> (s + 1, r)
