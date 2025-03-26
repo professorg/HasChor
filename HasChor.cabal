@@ -4,9 +4,9 @@ version:            0.1.0.1
 synopsis:           Functional choreographic programming in Haskell
 license:            BSD-3-Clause
 license-file:       LICENSE
-author:             Gan Shen
-maintainer:         Gan Shen <gan_shen@icloud.com>
-copyright:          (c) Gan Shen 2022
+author:             Anonymous
+maintainer:         Anonymous
+copyright:          (c) Gan Shen 2022, Anonymous
 category:           Concurrency
 description:
     HasChor is a library for functional choreographic programming in Haskell.
@@ -19,15 +19,6 @@ tested-with:
 
 extra-doc-files:
     README.md
-
-source-repository head
-    type:     git
-    location: https://github.com/gshen42/HasChor
-
-source-repository this
-    type:     git
-    location: https://github.com/gshen42/HasChor
-    tag:      v0.1.0.1
 
 library
     hs-source-dirs:   src
