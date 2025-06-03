@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 module Main where
 
@@ -10,7 +11,12 @@ import ChoreographyArrowChoice.Choreo
 import ChoreographyArrowChoice.Location
 import ChoreographyArrowChoice.Network
 import Data.Proxy
+import GHC.TypeLits
 import Control.Arrow
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Profunctor
+import Control.Arrow.Freer.FreerChoiceArrow
 
 type Client = "client"
 
@@ -66,6 +72,37 @@ kvs =
     ) >>>
   arr fst >>>
   primary ~> client
+
+participants :: Choreo ar b a -> Set LocTm
+participants (Hom _) = Set.empty
+participants (Comp _ e c) =
+  participants c <>
+  case e of
+    Local l _ -> Set.singleton $ symbolVal l
+    Comm l l' -> Set.fromList $ [symbolVal l, symbolVal l']
+    Cond l c' -> participants c' <> Set.singleton (symbolVal l)
+
+participants_next_cond :: Choreo ar b a -> Set LocTm
+participants_next_cond (Hom _) = Set.empty
+participants_next_cond (Comp _ (Cond l c) _) = participants c <> Set.singleton (symbolVal l)
+participants_next_cond (Comp _ _ c) = participants_next_cond c
+
+-- partial function; use only when you know x and y are the same value
+mergeUnwrap :: (KnownSymbol l, KnownSymbol l', Eq a) => a @ l -> a @ l' -> a
+mergeUnwrap (Wrap x) (Wrap y)
+  | x == y = x
+
+--TODO
+-- rewrite_next_cond :: Choreo ar b a -> Choreo ar b a
+-- rewrite_next_cond (Hom f) = Hom f
+-- rewrite_next_cond (Comp f (Cond l c') c) =
+--   let p = participants_next_cond $ Comp f (Cond l c') c in
+--     -- I want something like `Comm l l1 &&& Comm l l2 &&& Comm l l3 &&& ...` where `p = [l1, l2, l3, ...]`
+--     _
+-- rewrite_next_cond (Comp f e c) =
+--   if participants_next_cond (Comp f e c) == Set.empty
+--   then Comp f e c
+--   else Comp f e $ rewrite_next_cond c
 
 epp_kvs_client :: Network (Kleisli IO) () (Response @ Client)
 epp_kvs_client = epp kvs $ toLocTm client
