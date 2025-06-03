@@ -12,9 +12,6 @@ import ChoreographyArrow.Choreo
 import ChoreographyArrow.Location
 import Data.Maybe
 import Data.Typeable
-import Data.Time
-import System.Environment
-import System.Random
 import Data.Profunctor ( Strong, Profunctor(lmap) )
 import Control.Arrow
 import Control.Arrow.ArrowIO
