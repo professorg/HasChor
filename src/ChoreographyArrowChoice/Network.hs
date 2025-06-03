@@ -30,7 +30,7 @@ data NetworkSig ar b a where
        -> NetworkSig ar () a
   -- | Broadcasting.
   BCast :: Show a
-        => NetworkSig ar a ()
+        => NetworkSig ar (a @ l) a
 
 instance Show (NetworkSig ar b a) where
   show (Run _) = "Run"
@@ -56,7 +56,7 @@ recv :: Read a => LocTm -> Network ar () a
 recv l = embed $ Recv l
 
 -- | Broadcast a message to all participants.
-broadcast :: Show a => Network ar a ()
+broadcast :: Show a => Network ar (a @ l) a
 broadcast = embed BCast
 
 -- * Message transport backends

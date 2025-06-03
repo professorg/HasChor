@@ -99,7 +99,8 @@ runNetworkHttp cfg self prog b = do
             Right _  -> return ()
         handler mgr chans (Recv l) = Kleisli $ \() -> liftIO $ read <$> readChan (chans ! l) -- liftIO $ read <$> readChan (chans ! l)
         handler mgr chans BCast    = Kleisli $ \x -> do -- mapM_ (handler mgr chans) $ fmap Send (locs cfg)
-          mapM_ (\l -> runKleisli (handler mgr chans (Send l)) x) $ locs cfg
+          mapM_ (\l -> runKleisli (handler mgr chans (Send l)) $ unwrap x) $ locs cfg
+          pure $ unwrap x
 
     api :: Proxy API
     api = Proxy

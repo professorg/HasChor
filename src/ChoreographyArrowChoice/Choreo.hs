@@ -20,27 +20,23 @@ import Control.Arrow.ArrowIO (ArrowIO)
 
 -- * The Choreo monad
 
--- | A constrained version of `unwrap` that only unwraps values located at a
--- specific location.
-type Unwrap l = forall a. a @ l -> a
-
 -- | Effect signature for the `Choreo` monad. @m@ is a monad that represents
 -- local computations.
 data ChoreoSig ar b a where
   Local :: KnownSymbol l
         => Proxy l
-        -> ar (Unwrap l, b) a
-        -> ChoreoSig ar b (a @ l)
+        -> ar b a
+        -> ChoreoSig ar (b @ l) (a @ l)
 
   Comm :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
        => Proxy l
        -> Proxy l'
        -> ChoreoSig ar (a @ l) (a @ l')
---TODO
-  Cond :: (Show a, Read a, KnownSymbol l)
+
+  Cond :: (Show b, Read b, KnownSymbol l)
        => Proxy l
-       -> Choreo ar a (Either b c)
-       -> ChoreoSig ar (a @ l) (Either b c)
+       -> Choreo ar b a
+       -> ChoreoSig ar (b @ l) a
 
 instance Show (ChoreoSig ar b a) where
   show (Local l _) = "Local " ++ symbolVal l
@@ -56,13 +52,13 @@ runChoreo = interp handler
   where
     handler :: (Profunctor ar, ArrowChoice ar) => ChoreoSig ar b a -> ar b a
     handler (Local _ ar) = -- wrap <$> m unwrap
-      (\x -> (unwrap, x)) ^>> ar >>^ wrap
+      unwrap ^>> ar >>^ wrap
 
     handler (Comm _ _) = -- return $ (wrap . unwrap) a
       arr (unwrap >>> wrap)
 
     handler (Cond _ ar) = -- runChoreo $ c (unwrap a)
-      unwrap ^>> runChoreo ar
+      arr unwrap >>> runChoreo ar
 
 -- | Endpoint projection.
 epp :: Choreo ar b a -> LocTm -> Network ar b a
@@ -71,7 +67,7 @@ epp c l' = interp handler c
     handler :: ChoreoSig ar b a -> Network ar b a
     handler (Local l ar)
       | toLocTm l == l' = -- wrap <$> run (m unwrap)
-          (\x -> (unwrap, x)) ^>> run ar >>^ wrap
+          unwrap ^>> run ar >>^ wrap
       | otherwise       = arr (const Empty) -- return Empty
     handler (Comm s r)
       | toLocTm s == toLocTm r = -- return $ wrap (unwrap a)
@@ -81,12 +77,14 @@ epp c l' = interp handler c
       | toLocTm r == l'        = -- wrap <$> recv (toLocTm s)
           const () ^>> recv (toLocTm s) >>^ wrap
       | otherwise              = arr (const Empty) -- return Empty
---TODO
     handler (Cond l c)
-      | toLocTm l == l' = unwrap ^>> (broadcast &&& id) >>> snd ^>> epp c l' -- broadcast (unwrap a) >> epp (c (unwrap a)) l'
-      | otherwise       = const () ^>> recv (toLocTm l) >>> epp c l'
+      | toLocTm l == l' = broadcast >>> epp c l' -- broadcast >>> epp c l'
+      | otherwise       = const () ^>> recv (toLocTm l) >>> epp c l' -- recv (toLocTm l) >>> epp c l'
 
 -- * Choreo operations
+
+discard :: Arrow ar => ar b ()
+discard = arr (const ())
 
 -- | Perform a local computation at a given location.
 locally :: KnownSymbol l
@@ -94,9 +92,19 @@ locally :: KnownSymbol l
 --         -> (Unwrap l -> m a) -- ^ The local computation given a constrained
 --                              -- unwrap funciton.
 --         -> Choreo m (a @ l)
-        -> ar (Unwrap l, b) a
-        -> Choreo ar b (a @ l)
+        -> ar b a
+        -> Choreo ar (b @ l) (a @ l)
 locally l ar = embed (Local l ar)
+
+locally0 :: KnownSymbol l
+        => Proxy l           -- ^ Location performing the local computation.
+--         -> (Unwrap l -> m a) -- ^ The local computation given a constrained
+--                              -- unwrap funciton.
+--         -> Choreo m (a @ l)
+        -> ar () a
+        -> Choreo ar b (a @ l)
+locally0 l ar = discard >>> arr wrap >>> locally l ar
+
 
 -- | Communication between a sender and a receiver.
 (~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
@@ -107,30 +115,25 @@ locally l ar = embed (Local l ar)
 
 --TODO
 -- -- | Conditionally execute choreographies based on a located value.
--- cond :: (Show a, Read a, KnownSymbol l)
---      => (Proxy l, a @ l)  -- ^ A pair of a location and a scrutinee located on
---                           -- it.
---      -> (a -> Choreo m b) -- ^ A function that describes the follow-up
---                           -- choreographies based on the value of scrutinee.
---      -> Choreo m b
--- cond (l, a) c = toFreer (Cond l a c)
+cond :: (Show b, Read b, KnownSymbol l)
+     => Proxy l
+     -> Choreo ar b a
+     -> Choreo ar (b @ l) a
+cond l c = embed (Cond l c)
 
 -- | A variant of `~>` that sends the result of a local computation.
 (~~>) :: (Show a, Read a, KnownSymbol l, KnownSymbol l')
-      => (Proxy l, ar (Unwrap l, b) a)
+      => (Proxy l, ar b a)
       -> Proxy l'
-      -> Choreo ar b (a @ l')
+      -> Choreo ar (b @ l) (a @ l')
 (~~>) (l, ar) l' = l `locally` ar >>> (l ~> l')
 
 -- -- | A variant of `cond` that conditonally executes choregraphies based on the
 -- -- result of a local computation.
--- cond' :: (Show a, Read a, KnownSymbol l)
---       => (Proxy l, Unwrap l -> m a) -- ^ A pair of a location and a local
---                                     -- computation.
---       -> (a -> Choreo m b)          -- ^ A function that describes the follow-up
---                                     -- choreographies based on the result of the
---                                     -- local computation.
---       -> Choreo m b
--- cond' (l, m) c = do
---   x <- l `locally` m
---   cond (l, x) c
+cond' :: (Show x, Read x, KnownSymbol l)
+      => Proxy l
+      -> ar b x
+      -> Choreo ar x a
+      -> Choreo ar (b @ l) a
+cond' l ar c = l `locally` ar >>> cond l c
+

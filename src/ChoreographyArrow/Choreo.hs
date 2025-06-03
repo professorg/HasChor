@@ -20,10 +20,6 @@ import Control.Arrow.ArrowIO (ArrowIO)
 
 -- * The Choreo monad
 
--- | A constrained version of `unwrap` that only unwraps values located at a
--- specific location.
-type Unwrap l = forall a. a @ l -> a
-
 -- | Effect signature for the `Choreo` monad. @m@ is a monad that represents
 -- local computations.
 data ChoreoSig ar b a where

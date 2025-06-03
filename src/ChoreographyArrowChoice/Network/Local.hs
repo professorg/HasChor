@@ -51,7 +51,9 @@ runNetworkLocal cfg self prog = runKleisli $ interp handler prog
     handler (Send l) = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
     handler (Recv l) = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
     handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
-      Kleisli $ \x -> mapM_ (\l -> runKleisli (handler $ Send l) x) (locs cfg)
+      Kleisli $ \x -> do
+        mapM_ (\l -> runKleisli (handler $ Send l) $ unwrap x) (locs cfg)
+        pure $ unwrap x
 
 instance Backend LocalConfig where
   runNetwork = runNetworkLocal
