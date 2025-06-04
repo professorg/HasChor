@@ -10,6 +10,7 @@ import Control.Monad.Freer
 import Control.Monad.IO.Class
 import Control.Arrow.Freer.FreerChoiceArrow
 import Control.Arrow.ArrowIO
+import Data.HashSet
 import Data.Profunctor (Profunctor)
 import Control.Arrow (Kleisli (Kleisli))
 
@@ -30,13 +31,14 @@ data NetworkSig ar b a where
        -> NetworkSig ar () a
   -- | Broadcasting.
   BCast :: Show a
-        => NetworkSig ar (a @ l) a
+        => HashSet LocTm
+        -> NetworkSig ar (a @ l) a
 
 instance Show (NetworkSig ar b a) where
   show (Run _) = "Run"
   show (Send l) = "(self ~> " ++ l ++ ")"
   show (Recv l) = "(" ++ l ++ " ~> self)"
-  show BCast = "BCast"
+  show (BCast s) = "BCast(" ++ show s ++ ")"
 
 -- | Monad that represents network programs.
 type Network ar = FreerChoiceArrow (NetworkSig ar)
@@ -56,8 +58,8 @@ recv :: Read a => LocTm -> Network ar () a
 recv l = embed $ Recv l
 
 -- | Broadcast a message to all participants.
-broadcast :: Show a => Network ar (a @ l) a
-broadcast = embed BCast
+broadcast :: Show a => HashSet LocTm -> Network ar (a @ l) a
+broadcast s = embed $ BCast s
 
 -- * Message transport backends
 

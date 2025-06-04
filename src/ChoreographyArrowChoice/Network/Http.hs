@@ -97,9 +97,9 @@ runNetworkHttp cfg self prog b = do
           case res of
             Left err -> putStrLn $ "Error : " ++ show err
             Right _  -> return ()
-        handler mgr chans (Recv l) = Kleisli $ \() -> liftIO $ read <$> readChan (chans ! l) -- liftIO $ read <$> readChan (chans ! l)
-        handler mgr chans BCast    = Kleisli $ \x -> do -- mapM_ (handler mgr chans) $ fmap Send (locs cfg)
-          mapM_ (\l -> runKleisli (handler mgr chans (Send l)) $ unwrap x) $ locs cfg
+        handler mgr chans (Recv l)  = Kleisli $ \() -> liftIO $ read <$> readChan (chans ! l) -- liftIO $ read <$> readChan (chans ! l)
+        handler mgr chans (BCast s) = Kleisli $ \x -> do -- mapM_ (handler mgr chans) $ fmap Send (locs cfg)
+          mapM_ (\l -> runKleisli (handler mgr chans (Send l)) $ unwrap x) s
           pure $ unwrap x
 
     api :: Proxy API

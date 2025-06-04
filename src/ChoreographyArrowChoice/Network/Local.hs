@@ -47,12 +47,12 @@ runNetworkLocal :: MonadIO m => LocalConfig -> LocTm -> Network (Kleisli m) b a 
 runNetworkLocal cfg self prog = runKleisli $ interp handler prog
   where
     handler :: MonadIO m => NetworkSig (Kleisli m) b a -> Kleisli m b a
-    handler (Run ar) = ar
-    handler (Send l) = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
-    handler (Recv l) = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
-    handler BCast   = -- mapM_ handler $ fmap Send (locs cfg)
+    handler (Run ar)  = ar
+    handler (Send l)  = arrIO (\a -> liftIO $ writeChan ((locToBuf cfg ! l) ! self) (show a))
+    handler (Recv l)  = arrIO0 $ liftIO $ read <$> readChan ((locToBuf cfg ! self) ! l)
+    handler (BCast s) = -- mapM_ handler $ fmap Send (locs cfg)
       Kleisli $ \x -> do
-        mapM_ (\l -> runKleisli (handler $ Send l) $ unwrap x) (locs cfg)
+        mapM_ (\l -> runKleisli (handler $ Send l) $ unwrap x) s
         pure $ unwrap x
 
 instance Backend LocalConfig where

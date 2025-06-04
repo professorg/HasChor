@@ -10,6 +10,8 @@ import ChoreographyArrowChoice.Network
 import Control.Monad.Freer
 import Control.Arrow.Freer.FreerChoiceArrow
 import Data.List
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.Proxy
 import GHC.TypeLits
 import Data.Profunctor
@@ -46,6 +48,17 @@ instance Show (ChoreoSig ar b a) where
 -- | Monad for writing choreographies.
 type Choreo ar = FreerChoiceArrow (ChoreoSig ar)
 
+-- This can probably be written generically for any monoid
+participants :: Choreo ar b a -> HashSet LocTm
+participants (Hom _) = HS.empty
+participants (Comp _ e c) =
+  participants c <>
+  case e of
+    Local l _ -> HS.singleton $ symbolVal l
+    Comm l l' -> HS.fromList $ [symbolVal l, symbolVal l']
+    -- This recursive call is the part that worries me
+    Cond l c' -> participants c' <> HS.singleton (symbolVal l)
+
 -- | Run a `Choreo` monad directly.
 runChoreo :: (Profunctor ar, ArrowChoice ar) => Choreo ar b a -> ar b a
 runChoreo = interp handler
@@ -78,8 +91,12 @@ epp c l' = interp handler c
           const () ^>> recv (toLocTm s) >>^ wrap
       | otherwise              = arr (const Empty) -- return Empty
     handler (Cond l c)
-      | toLocTm l == l' = broadcast >>> epp c l' -- broadcast >>> epp c l'
-      | otherwise       = const () ^>> recv (toLocTm l) >>> epp c l' -- recv (toLocTm l) >>> epp c l'
+      | toLocTm l == l'  = broadcast p >>> epp c l' -- broadcast >>> epp c l'
+      | l' `HS.member` p = const () ^>> recv (toLocTm l) >>> epp c l' -- recv (toLocTm l) >>> epp c l'
+      | otherwise        = arr $ const $ error "matching on an unused branch"
+      where
+        -- We don't want to broadcast to the broadcaster l'
+        p = HS.delete (toLocTm l) $ participants c
 
 -- * Choreo operations
 

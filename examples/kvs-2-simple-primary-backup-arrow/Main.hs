@@ -13,8 +13,8 @@ import ChoreographyArrowChoice.Network
 import Data.Proxy
 import GHC.TypeLits
 import Control.Arrow
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.Profunctor
 import Control.Arrow.Freer.FreerChoiceArrow
 
@@ -73,18 +73,9 @@ kvs =
   arr fst >>>
   primary ~> client
 
-participants :: Choreo ar b a -> Set LocTm
-participants (Hom _) = Set.empty
-participants (Comp _ e c) =
-  participants c <>
-  case e of
-    Local l _ -> Set.singleton $ symbolVal l
-    Comm l l' -> Set.fromList $ [symbolVal l, symbolVal l']
-    Cond l c' -> participants c' <> Set.singleton (symbolVal l)
-
-participants_next_cond :: Choreo ar b a -> Set LocTm
-participants_next_cond (Hom _) = Set.empty
-participants_next_cond (Comp _ (Cond l c) _) = participants c <> Set.singleton (symbolVal l)
+participants_next_cond :: Choreo ar b a -> HashSet LocTm
+participants_next_cond (Hom _) = HS.empty
+participants_next_cond (Comp _ (Cond l c) _) = participants c <> HS.singleton (symbolVal l)
 participants_next_cond (Comp _ _ c) = participants_next_cond c
 
 -- partial function; use only when you know x and y are the same value
